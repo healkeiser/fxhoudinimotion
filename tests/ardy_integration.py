@@ -37,7 +37,7 @@ def steps(pos):
 path = [
     {"pos": [1.0, 0.0, 2.0], "time_s": 0.0},
     {"pos": [3.0, 0.0, 2.0], "time_s": 2.5},
-    {"pos": [4.0, 0.0, 2.5], "time_s": 5.5},
+    {"pos": [3.5, 0.0, 4.5], "time_s": 5.5},  # a left turn, not a natural walk
 ]
 clip, secs = run(
     {
@@ -86,4 +86,81 @@ print(
     % (secs, early, late, jitter)
 )
 assert jitter < 0.02, "the end of a long timeline jitters"
+# Pose keys (full-body on a chunk boundary, a raised left hand), taken from
+# a first walk so they are reachable. Measured at the keyed frames.
+walk = {"segments": [{"prompt": "A person walks forward.", "duration_s": 6.0}]}
+ref, _ = run(dict(walk, seed=1))
+names = [str(n) for n in ref["joint_names"]]
+hand = names.index("LeftHand")
+hand_end = names.index("LeftHandEnd")
+raised = ref["world_pos"][100].copy()
+raised[[hand, hand_end], 1] += 0.3  # the key constrains both
+keys = [
+    {
+        "time_s": 40 / 20,
+        "world_pos": ref["world_pos"][40].tolist(),
+        "world_rot": ref["world_rot"][40].tolist(),
+        "joints": None,
+    },
+    {
+        "time_s": 100 / 20,
+        "world_pos": raised.tolist(),
+        "world_rot": ref["world_rot"][100].tolist(),
+        "joints": ["LeftHand"],
+    },
+]
+clip, secs = run(dict(walk, seed=2, keyframes=keys))
+pos = clip["world_pos"]
+body = np.linalg.norm(pos[40] - ref["world_pos"][40], axis=-1).max()
+reach = np.linalg.norm(pos[100, hand] - raised[hand])
+
+
+def native(req):
+    """ARDY's own single call (scripts/generate.py's), same keys and seed:
+    the reference for what chunking may add at its seams."""
+    import diffusion_adapter as da
+    import torch
+    from ardy.motion_rep.tools import length_to_mask
+    from ardy.tools import seed_everything
+
+    m, dev = backend._model, backend._device
+    inp = da.model_inputs(fs.GenerateRequest(**req).model_dump(), ab.ARDY)
+    n = sum(inp.num_frames)
+    cons = ab._constraint_objects(inp.constraints, m.skeleton)
+    obs, mask = m.motion_rep.create_conditions_from_constraints_batched(
+        cons, torch.tensor([n], device=dev), to_normalize=True, device=dev
+    )
+    seed_everything(int(req["seed"]))
+    with torch.no_grad():
+        out = m(
+            inp.texts[:1],
+            n,
+            num_denoising_steps=int(m.diffusion.num_base_steps),
+            cfg_weight=ab.CFG_WEIGHT,
+            pad_mask=length_to_mask(torch.tensor([n], device=dev)),
+            first_heading_angle=torch.zeros(1, device=dev),
+            motion_mask=mask,
+            observed_motion=obs,
+            crop_history_length=ab.history_frames(
+                20.0, m.gen_horizon_len, m.num_frames_per_token, 100
+            ),
+        )
+    return (
+        m.motion_rep.inverse(out, is_normalized=True)["posed_joints"][0]
+        .cpu()
+        .numpy()
+    )
+
+
+keyed = dict(walk, seed=2, keyframes=keys)
+s, r = steps(pos), steps(native(keyed))
+worst = max(s[f - 4 : f + 4].max() / r[f - 4 : f + 4].max() for f in (40, 100))
+print(
+    "keys: %.1f s, full-body key %.3f m off (worst joint), hand key %.3f m off, "
+    "worst step around a key %.2fx ARDY's native call"
+    % (secs, body, reach, worst)
+)
+assert body < 0.1, "the full-body key is not reached"
+assert reach < 0.1, "the end-effector key is not reached"
+assert worst < 1.25, "chunking adds a pop around a key"
 print("ok")

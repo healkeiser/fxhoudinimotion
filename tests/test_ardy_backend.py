@@ -106,9 +106,73 @@ def test_history_defaults_to_4_s_and_fits_the_trained_window():
 
 
 def test_segments_are_cut_into_horizons():
-    assert ab.chunks([100, 30], 40) == [
+    assert ab.chunks([100, 30], 40, 4) == [
         (0, 0, 40),
         (0, 40, 40),
         (0, 80, 20),
         (1, 100, 30),
     ]
+
+
+def test_chunks_and_histories_are_whole_tokens():
+    # ARDY reshapes a history into 4-frame tokens: a 30-frame first
+    # segment (1.5 s) used to hand the next chunk a 30-frame history
+    got = ab.chunks([30, 50], 40, 4)
+    assert got == [(0, 0, 32), (1, 32, 40), (1, 72, 8)]
+    for durations in ([30, 50], [31, 49, 7], [3, 77], [62, 18, 45], [1, 1, 60]):
+        got = ab.chunks(durations, 40, 4)
+        assert [s for _, s, _ in got] == [0] + [s + n for _, s, n in got][:-1]
+        assert sum(n for _, _, n in got) == sum(durations)
+        assert all(n % 4 == 0 for _, _, n in got[:-1]), got
+
+
+def test_a_segment_shorter_than_a_token_is_dropped():
+    assert ab.chunks([30, 1, 49], 40, 4) == [
+        (0, 0, 32),
+        (2, 32, 40),
+        (2, 72, 8),
+    ]
+
+
+def test_an_encoder_lost_mid_session_is_named():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    url = "http://127.0.0.1:%d/" % port
+
+    def encode(texts):  # what ARDY's gradio client does when the port is dead
+        raise ConnectionError("[WinError 10061] connection refused")
+
+    with pytest.raises(RuntimeError, match="text encoder unreachable at"):
+        ab.encode_prompts(encode, ["walk", "walk", "wave"], url)
+
+
+def test_prompts_are_encoded_once_each():
+    seen = []
+    got = ab.encode_prompts(
+        lambda t: seen.append(t) or t[0].upper(), ["a", "b", "a"], ""
+    )
+    assert got == {"a": "A", "b": "B"} and seen == [["a"], ["b"]]
+
+
+def test_lookahead_fits_the_window_and_the_clip():
+    # 80 history + 40 chunk leave room for one more horizon of 40
+    assert ab.lookahead(80, 40, 40, 200, 500) == 40
+    # history 160 + 40: the 200-frame window is full
+    assert ab.lookahead(160, 40, 40, 200, 500) == 0
+    # the clip ends 12 frames after this chunk
+    assert ab.lookahead(80, 40, 40, 200, 12) == 12
+
+
+def test_end_effector_sets_carry_the_hips():
+    # ARDY asserts one Hips position per constrained frame (its own
+    # LeftHandConstraintSet is ["LeftHand", "Hips"])
+    assert ab.effector_joints(["LeftHand"]) == ["LeftHand", "Hips"]
+    assert ab.effector_joints(["Hips", "LeftFoot"]) == ["Hips", "LeftFoot"]
+
+
+def test_constraints_get_guidance():
+    # a bare float is ARDY's text weight alone: its constraint weight is then
+    # 0 and every root path and pose key is ignored (measured 1.7 m off)
+    text, constraint = ab.CFG_WEIGHT
+    assert text > 0 and constraint > 0

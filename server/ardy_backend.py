@@ -54,15 +54,53 @@ def history_frames(
     return min(most, max(token, want))
 
 
-def chunks(num_frames, horizon: int) -> list:
+def chunks(num_frames, horizon: int, token: int) -> list:
     """[(segment index, first frame, frame count)]: each segment cut into
-    pieces of at most one horizon."""
+    pieces of at most one horizon. ARDY reads a history in whole tokens, so
+    the segment boundaries inside the clip move to the nearest token (a
+    segment shorter than half a token disappears) and every chunk but the
+    last is a whole number of tokens."""
+    total = sum(num_frames)
+    ends, cum = [], 0
+    for n in num_frames[:-1]:
+        cum += n
+        ends.append(min(total, (cum + token // 2) // token * token))
+    ends.append(total)
     out, start = [], 0
-    for k, n in enumerate(num_frames):
-        for off in range(0, n, horizon):
-            out.append((k, start + off, min(horizon, n - off)))
-        start += n
+    for k, end in enumerate(ends):
+        for s in range(start, end, horizon):
+            out.append((k, s, min(horizon, end - s)))
+        start = max(start, end)
     return out
+
+
+# (text, constraint) guidance, scripts/generate.py's default. A bare float
+# means text guidance only: ARDY then ignores root paths and pose keys.
+CFG_WEIGHT = (2.0, 2.0)
+
+# Each chunk also generates up to one more horizon, so it sees the pose keys
+# and waypoints just past it (ARDY's own calls see the whole clip's); the
+# extra frames are dropped and generated again by the next chunk.
+LOOKAHEAD = True
+
+
+def lookahead(
+    history: int, n: int, horizon: int, window: int, remaining: int
+) -> int:
+    """Frames generated past a chunk: one horizon, within the trained window
+    and the clip."""
+    return max(0, min(horizon, window - history - n, remaining))
+
+
+def encode_prompts(encode, texts, url) -> dict:
+    """{prompt: encode([prompt])}, once per distinct prompt. A failure while
+    the text encoder is gone is re-raised naming it (the container can stop
+    after the model loaded)."""
+    try:
+        return {t: encode([t]) for t in dict.fromkeys(texts)}
+    except Exception:
+        check_text_encoder(url)
+        raise
 
 
 def check_text_encoder(url: str, timeout: float = 3.0) -> None:
@@ -78,6 +116,13 @@ def check_text_encoder(url: str, timeout: float = 3.0) -> None:
             "text-encoder container (docker compose -f "
             "docker-compose.bridge.yaml up text-encoder -d): %s" % (url, e)
         ) from e
+
+
+def effector_joints(names) -> list:
+    """An end-effector set's joints, with the Hips ARDY needs on every
+    position-constrained frame (as its own LeftHandConstraintSet)."""
+    names = list(names)
+    return names if "Hips" in names else names + ["Hips"]
 
 
 def _constraint_objects(dicts, skeleton) -> list:
@@ -122,7 +167,7 @@ def _constraint_objects(dicts, skeleton) -> list:
                         pos,
                         rot,
                         root,
-                        joint_names=c["joint_names"],
+                        joint_names=effector_joints(c["joint_names"]),
                     )
                 )
         else:
@@ -205,14 +250,15 @@ class ArdyBackend(fs.Backend):
             )
         steps = int(model.diffusion.num_base_steps)
         horizon = int(model.gen_horizon_len)
+        token = int(model.num_frames_per_token)
         keep = history_frames(
-            ARDY.fps,
-            horizon,
-            int(model.num_frames_per_token),
-            req.options.get("history_s", HISTORY_S),
+            ARDY.fps, horizon, token, req.options.get("history_s", HISTORY_S)
         )
-        texts = {t: model._encode_text([t]) for t in set(inp.texts)}
-        plan = chunks(inp.num_frames, horizon)
+        window_frames = (int(WINDOW_S * ARDY.fps) // token) * token
+        texts = encode_prompts(
+            model._encode_text, inp.texts, self.text_encoder_url
+        )
+        plan = chunks(inp.num_frames, horizon, token)
         motion = None
         for i, (k, start, n) in enumerate(plan):
             progress.set(
@@ -220,15 +266,21 @@ class ArdyBackend(fs.Backend):
             )
             hist = None if motion is None else motion[:, -keep:]
             h = 0 if hist is None else hist.shape[1]
-            window = slice(start - h, start + n)
+            la = (
+                lookahead(h, n, horizon, window_frames, total - start - n)
+                if LOOKAHEAD
+                else 0
+            )
+            window = slice(start - h, start + n + la)
             feat, pad = texts[inp.texts[k]]
             with torch.no_grad():
                 out = model(
                     [inp.texts[k]],
-                    h + n,
+                    h + n + la,
                     num_denoising_steps=steps,
+                    cfg_weight=CFG_WEIGHT,
                     pad_mask=length_to_mask(
-                        torch.tensor([h + n], device=device)
+                        torch.tensor([h + n + la], device=device)
                     ),
                     first_heading_angle=(
                         torch.zeros(1, device=device) if hist is None else None
@@ -241,7 +293,7 @@ class ArdyBackend(fs.Backend):
                     text_pad_mask=pad,
                     init_history_sequence=hist,
                 )
-            new = out[:, h:]
+            new = out[:, h : h + n]
             motion = new if motion is None else torch.cat([motion, new], dim=1)
         progress.set(0.95, "post-processing")
         with torch.no_grad():
