@@ -119,7 +119,11 @@ def cook_animated(sop) -> None:
     path = hda.parm("clip_path").eval()
     if not path:
         return  # nothing generated yet: empty output, wait for Generate
-    c = clip.load(path)
+    try:
+        c = clip.load(path)
+    except (clipformat.ClipError, OSError) as e:
+        # a wrong or missing file is the user's to fix: say why, not where
+        raise hou.NodeError("Clip Path %s: %s" % (path, e)) from None
     index = clip.sample_index(
         hda.parm("frame_ref").eval(),
         hda.parm("start_frame").eval(),

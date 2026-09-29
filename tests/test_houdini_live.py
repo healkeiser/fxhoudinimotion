@@ -370,6 +370,22 @@ def test_kimodo_2_outputs_and_details():
         geo.destroy()
 
 
+def test_a_native_npz_is_a_clean_node_error():
+    """Clip Path on a raw Kimodo NPZ (what 1.1 downloaded): the node goes red
+    with the reason, not a Python traceback."""
+    fixture = _repo() / "tests" / "fixtures" / "kimodo_stop.npz"
+    geo = hou.node("/obj").createNode("geo", "fxmotion_native")
+    try:
+        node = geo.createNode("vb::kimodo_motion::2.0")
+        node.parm("clip_path").set(fixture.as_posix())
+        node.geometry(2)  # cooks output 2; its error stays on the inner SOP
+        errors = " ".join(node.node("animated_pose").errors())
+        assert "not an fxmotion.clip/1 clip" in errors, errors
+        assert "Traceback" not in errors, errors
+    finally:
+        geo.destroy()
+
+
 def run():
     results = []
     for name, fn in sorted(globals().items()):

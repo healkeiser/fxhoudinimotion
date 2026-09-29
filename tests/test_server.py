@@ -142,11 +142,11 @@ def test_identical_requests_hit_the_cache_unless_forced(server):
 
 def test_non_ascii_prompt_is_cached(server):
     client, backend, _ = server
-    prompt = "une personne marche é 一"
+    prompt = "une personne marche \u00e9 \u4e00"
     req = {"segments": [{"prompt": prompt, "duration_s": 1.0}]}
     assert wait(client, submit(client, req))["status"] == "done"
     assert wait(client, submit(client, req))["cached"] is True
-    assert backend.calls[0].segments[0].prompt.endswith("一")
+    assert backend.calls[0].segments[0].prompt.endswith("\u4e00")
 
 
 def test_a_failure_is_reported(server):

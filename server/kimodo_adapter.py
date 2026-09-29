@@ -147,16 +147,18 @@ def to_clip(npz, canon: Canon, *, segments=None, source=None) -> dict:
 
 
 def _check_sample(what, time_s, frames) -> int:
-    """The sample for `time_s`, refused if it falls outside a clip of
-    `frames` samples (None: no upper bound known)."""
+    """The sample for `time_s` in a clip of `frames` samples (None: no upper
+    bound known). Segments truncate to whole samples while times round, so
+    a time on the very end of the clip can land one sample past it: that
+    one sample is clamped to the last. Anything further is refused."""
     f = sample(time_s)
-    if f < 0 or (frames is not None and f >= frames):
-        end = "" if frames is None else " to %g s" % ((frames - 1) / FPS)
+    if f < 0 or (frames is not None and f > frames):
+        end = "" if frames is None else " to %g s" % (frames / FPS)
         raise AdapterError(
             "kimodo: %s time %g s is outside the clip (0%s)"
             % (what, float(time_s), end)
         )
-    return f
+    return f if frames is None else min(f, frames - 1)
 
 
 def keyframe_constraints(keyframes, canon: Canon, frames=None) -> list:
@@ -210,7 +212,7 @@ def keyframe_constraints(keyframes, canon: Canon, frames=None) -> list:
     return out
 
 
-def _path_items(points, duration_s, frames):
+def _path_items(points, frames):
     """[(sample, [x, z])], deduplicated by sample (first wins), sorted.
     `frames`, the clip length in samples, bounds timed points."""
     timed = [p.get("time_s") is not None for p in points]
@@ -223,7 +225,8 @@ def _path_items(points, duration_s, frames):
         at = [_check_sample("root_path", p["time_s"], frames) for p in points]
     elif len(xz) > 1:
         # spread evenly over the clip, as 1.1 did
-        last = max(2, int(duration_s * FPS)) - 1
+        # the last point on the last sample the clip actually has
+        last = max(1, frames) - 1
         at = [int(round(i * last / (len(xz) - 1))) for i in range(len(xz))]
     else:
         at = [0]
@@ -263,7 +266,7 @@ def kimodo_inputs(req: dict) -> KimodoInputs:
     num_frames = [max(1, int(d * FPS)) for d in durs]
     total = sum(num_frames)
     root_path = req.get("root_path") or []
-    items = _path_items(root_path, sum(durs), total) if root_path else []
+    items = _path_items(root_path, total) if root_path else []
     if opts.get("canon") is not None:
         canon = Canon(*(float(v) for v in opts["canon"]))
     elif items:

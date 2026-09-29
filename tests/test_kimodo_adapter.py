@@ -230,3 +230,32 @@ def test_times_outside_the_clip_are_refused():
     }
     with pytest.raises(ka.AdapterError, match="keyframe time -0.5 s"):
         ka.kimodo_inputs(_req(keyframes=[kf]))
+
+
+def test_a_key_on_the_last_frame_is_accepted_at_24_fps():
+    # 4 x 25 frames at 24 fps: each segment truncates to 31 samples, 124 in
+    # all, while the key on the last frame rounds to sample 124
+    segs = [{"prompt": "walk", "duration_s": 25 / 24}] * 4
+    clip = ka.to_clip(_npz(), ka.Canon())
+    kf = {
+        "time_s": 99 / 24,
+        "world_pos": clip["world_pos"][0].tolist(),
+        "world_rot": clip["world_rot"][0].tolist(),
+        "joints": None,
+    }
+    inp = ka.kimodo_inputs(_req(segments=segs, keyframes=[kf]))
+    assert sum(inp.num_frames) == 124
+    assert inp.constraints[-1]["frame_indices"] == [123]
+    last = [
+        {"pos": [0.0, 0.0, 0.0], "time_s": 0.0},
+        {"pos": [0.0, 0.0, 1.0], "time_s": 99 / 24},
+    ]
+    inp = ka.kimodo_inputs(_req(segments=segs, root_path=last))
+    assert inp.constraints[-1]["frame_indices"] == [0, 123]
+
+
+def test_an_untimed_path_ends_on_the_last_sample():
+    segs = [{"prompt": "walk", "duration_s": 25 / 24}] * 4
+    path = [{"pos": [0.0, 0.0, float(i)]} for i in range(3)]
+    inp = ka.kimodo_inputs(_req(segments=segs, root_path=path))
+    assert inp.constraints[-1]["frame_indices"][-1] == 123
