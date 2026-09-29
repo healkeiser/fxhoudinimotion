@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-PURE = ["fxmotion", "fxmotion.skeletons"]
+PURE = ["fxmotion", "fxmotion.skeletons", "fxmotion.clipformat"]
 
 
 @pytest.mark.parametrize("module", PURE)

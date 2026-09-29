@@ -1,6 +1,7 @@
 output/
 .cache/
 *.npz
+!tests/fixtures/*.npz
 .env
 
 # Python
