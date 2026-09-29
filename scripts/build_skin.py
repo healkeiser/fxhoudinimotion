@@ -1,9 +1,9 @@
-"""Build the embedded geometry for the HDA's skin outputs, run with hython:
+"""Build a skeleton's rest geometry (skin + bind skeleton), run with hython:
 
-    hython scripts/build_skin.py [skin_standard.npz] [out_dir]
+    hython scripts/build_skin.py <skeleton> [skin_standard.npz] [out_dir]
 
 Produces two .bgeo.sc files, read by the fxmotion skeleton registry:
-  - skin.bgeo.sc  : the SOMA77 body mesh in its A-pose bind, with a KineFX
+  - skin.bgeo.sc  : the body mesh in its A-pose bind, with a KineFX
                     `boneCapture` attribute (weights from Kimodo LBS, bind from
                     bind_rig_transform). Drive it with kinefx::jointdeform
                     (in0=this, in1=A-pose rest skeleton, in2=animated skeleton).
@@ -11,7 +11,7 @@ Produces two .bgeo.sc files, read by the fxmotion skeleton registry:
                     mesh is bound to.
 
 No torch needed: skin_standard.npz is a plain .npz, and the T-pose offsets (tp)
-come from the shared TPOSE_ROTS literals. The bind orientation uses bind_rig @
+come from the registry's rest rotations. The bind orientation uses bind_rig @
 tp so the skeletons stay bone-aligned and consistent with the animated output0
 (the per-joint tp offset cancels in jointdeform's anim @ inv(bind)).
 """
@@ -25,26 +25,44 @@ import numpy as np
 sys.path.insert(
     0, str(Path(__file__).resolve().parents[1] / "houdini" / "python")
 )
-from fxmotion.skeletons.soma77 import TPOSE_ROTS  # noqa: E402
+from fxmotion import skeletons  # noqa: E402
 
 _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parent
-# Default assumes the kimodo repo is cloned alongside this one (setup guide).
-_DEFAULT_NPZ = (
-    _REPO.parent
+# where each skeleton's skin_standard.npz lives when the repos sit side by side
+_DEFAULT_NPZ = {
+    "soma77": _REPO.parent
     / "kimodo"
     / "kimodo"
     / "assets"
     / "skeletons"
-    / "somaskel77"
-    / "skin_standard.npz"
-)
-_SKIN_NPZ = Path(sys.argv[1]) if len(sys.argv) > 1 else _DEFAULT_NPZ
-_OUT_DIR = (
+    / "somaskel77",
+    "ardy_core": _REPO.parent
+    / "ardy"
+    / "ardy"
+    / "assets"
+    / "skeletons"
+    / "cskel27",
+}
+_SKELETON = sys.argv[1] if len(sys.argv) > 1 else "soma77"
+_SKIN_NPZ = (
     Path(sys.argv[2])
     if len(sys.argv) > 2
+    else _DEFAULT_NPZ[_SKELETON] / "skin_standard.npz"
+)
+_OUT_DIR = (
+    Path(sys.argv[3])
+    if len(sys.argv) > 3
     else _REPO / "houdini" / "python" / "fxmotion" / "skeletons" / "data"
 )
+
+
+def _tpose_offsets():
+    """Column-vector offsets that make each joint frame bone-aligned: the
+    transpose of the registry's row-vector rest rotations (identity for
+    skeletons whose frames are world-aligned)."""
+    rest = skeletons.get(_SKELETON).rest_rot
+    return np.swapaxes(np.asarray(rest, dtype=np.float64), -1, -2)
 
 
 def _houdini_world_rot(col_vec_rot):
@@ -54,7 +72,7 @@ def _houdini_world_rot(col_vec_rot):
 
 def _load():
     s = np.load(_SKIN_NPZ, allow_pickle=True)
-    return {
+    d = {
         "bv": s["bind_vertices"].astype(np.float64),
         "faces": s["faces"].astype(np.int64),
         "idx": s["lbs_indices"].astype(np.int64),
@@ -63,11 +81,17 @@ def _load():
         "names": [str(x) for x in s["rig_joint_names"]],
         "conn": s["rig_joint_connections"].astype(np.int64),
     }
+    want = list(skeletons.get(_SKELETON).joint_names)
+    if d["names"] != want:
+        raise ValueError(
+            "%s skin joints differ from the registry's order" % _SKELETON
+        )
+    return d
 
 
 def build_skin_geo(d):
     """Body mesh + capture, packed into a `boneCapture` index-pair attrib."""
-    tp = np.asarray(TPOSE_ROTS, dtype=np.float64).reshape(-1, 3, 3)
+    tp = _tpose_offsets()
     bv, faces, idx, w, brt = d["bv"], d["faces"], d["idx"], d["w"], d["brt"]
     names = d["names"]
     J, V = len(names), bv.shape[0]
@@ -133,7 +157,7 @@ def build_skin_geo(d):
 
 def build_apose_skeleton(d):
     """A-pose rest skeleton (feet on floor): name, transform, parent lines."""
-    tp = np.asarray(TPOSE_ROTS, dtype=np.float64).reshape(-1, 3, 3)
+    tp = _tpose_offsets()
     brt, names, conn = d["brt"], d["names"], d["conn"]
     J = len(names)
     g = hou.Geometry()
@@ -162,13 +186,13 @@ def main():
     if not _SKIN_NPZ.exists():
         raise FileNotFoundError(
             f"skin_standard.npz not found at {str(_SKIN_NPZ)!r}. Pass it explicitly: "
-            "hython scripts/build_skin.py /path/to/skin_standard.npz [out_dir]"
+            "hython scripts/build_skin.py <skeleton> /path/to/skin_standard.npz [out_dir]"
         )
     d = _load()
     skin = build_skin_geo(d)
     apose = build_apose_skeleton(d)
-    skin_path = _OUT_DIR / "soma77_skin.bgeo.sc"
-    apose_path = _OUT_DIR / "soma77_apose.bgeo.sc"
+    skin_path = _OUT_DIR / ("%s_skin.bgeo.sc" % _SKELETON)
+    apose_path = _OUT_DIR / ("%s_apose.bgeo.sc" % _SKELETON)
     skin.saveToFile(str(skin_path))
     apose.saveToFile(str(apose_path))
     bc = skin.findPointAttrib("boneCapture")

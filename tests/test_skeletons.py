@@ -35,3 +35,24 @@ def test_unknown_skeleton_names_the_known_ones():
 
 def test_get_returns_the_same_object():
     assert skeletons.get("soma77") is skeletons.get("soma77")
+
+
+def test_ardy_core_is_a_parent_first_t_pose():
+    s = skeletons.get("ardy_core")
+    assert len(s.joint_names) == 27 and s.index("Hips") == 0
+    assert all(p < i for i, p in enumerate(s.parents) if p >= 0)
+    assert np.allclose(s.rest_rot, np.eye(3))  # world-axis-aligned frames
+    hand, arm = s.rest_pos[s.index("LeftHand")], s.rest_pos[s.index("LeftArm")]
+    assert (
+        abs(hand[1] - arm[1]) < 0.05 and hand[0] > arm[0] + 0.4
+    )  # arm out, level
+
+
+def test_ardy_core_rest_geometry_ships_with_the_package():
+    s = skeletons.get("ardy_core")
+    assert s.skin.is_file() and s.skin.stat().st_size > 50_000
+    assert s.capture_pose.is_file()
+
+
+def test_registry_lists_both_skeletons():
+    assert skeletons.names() == ("soma77", "ardy_core")

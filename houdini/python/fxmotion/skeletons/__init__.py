@@ -47,7 +47,21 @@ def _soma77() -> Skeleton:
     )
 
 
-_BUILDERS = {"soma77": _soma77}
+def _ardy_core() -> Skeleton:
+    from . import ardy_core as d
+
+    return Skeleton(
+        name="ardy_core",
+        joint_names=tuple(d.JOINTS),
+        parents=tuple(d.PARENTS),
+        rest_pos=np.asarray(d.REST_POS, dtype=np.float64),
+        rest_rot=np.tile(np.eye(3), (len(d.JOINTS), 1, 1)),
+        skin=DATA / "ardy_core_skin.bgeo.sc",
+        capture_pose=DATA / "ardy_core_apose.bgeo.sc",
+    )
+
+
+_BUILDERS = {"soma77": _soma77, "ardy_core": _ardy_core}
 _CACHE: dict[str, Skeleton] = {}
 
 

@@ -20,7 +20,11 @@ extend-exclude = ["vendor", "backup", "houdini/otls"]
 # it. The snippets in CONTRIBUTING.md and docs/ are written to be read and
 # pasted, not to be black-clean: the live-test line is one statement on
 # purpose, so it can go into Houdini's Python Shell in one paste.
-exclude = ["houdini/python/fxmotion/skeletons/soma77.py", "*.md"]
+exclude = [
+    "houdini/python/fxmotion/skeletons/soma77.py",
+    "houdini/python/fxmotion/skeletons/ardy_core.py",
+    "*.md",
+]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
