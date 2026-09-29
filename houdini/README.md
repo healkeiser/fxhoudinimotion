@@ -251,6 +251,24 @@ resident in VRAM while the api container runs — stop it to free VRAM.
 
 ---
 
+## vb_ardy_motion_1.0.hda
+
+**Type:** `Sop/vb::ardy_motion::1.0`, under **Tab > fxmotion**.
+
+The same node as Kimodo Motion 2.0 on NVIDIA ARDY: the same inputs, outputs, timeline
+panel, root path and pose keys, with these differences:
+
+- **Skeleton:** ARDY's Core skeleton, 27 joints, no fingers. Its joint frames follow
+  the world axes at rest, not the bones as SOMA77's do, which matters to KineFX tools
+  that read joint orientation.
+- **Frame rate:** 20 fps; Retime to Scene FPS keeps the real duration.
+- **Model menu:** Horizon40 (2 s per step, smoother) or Horizon8 (0.4 s, more reactive).
+- **No Regenerate** on segments.
+- **Server:** `http://localhost:8002` (`scripts/run_ardy_server.ps1`).
+- **Prompt changes** take a moment to show: each step sees the last 4 s of motion.
+
+---
+
 ## Rebuilding the HDA
 
 The asset holds no logic: its callbacks and cooks call into
@@ -258,11 +276,13 @@ The asset holds no logic: its callbacks and cooks call into
 parameter interface or the skinning, regenerate it:
 
 ```bash
-# 1. Build the embedded skin geometry (mesh + capture, A-pose skeleton)
-hython scripts/build_skin.py
+# 1. Build a skeleton's skin geometry (mesh + capture, bind skeleton)
+hython scripts/build_skin.py soma77
+hython scripts/build_skin.py ardy_core
 
-# 2. Build vb::kimodo_motion::2.0, help card included, into houdini/otls/
-hython scripts/build_hda.py
+# 2. Build vb::kimodo_motion::2.0 and vb::ardy_motion::1.0, help cards
+#    included, into houdini/otls/ (or name one: kimodo, ardy)
+hython scripts/build_hda.py all
 ```
 
 ---

@@ -60,6 +60,7 @@ This is a fork of [chordee/kimodo-houdini-bridge](https://github.com/chordee/kim
 | **Server that stays warm** | Model preloaded once, results cached by prompt + duration + model + constraints, text encoder on CPU to spare VRAM. Runs on your workstation or a remote GPU box. |
 | **Status where you look** | Job state shown under the node in the network editor, plus a Test Connection button. No modal dialogs on Generate. |
 | **Offline loader** | Point Clip Path at any `fxmotion.clip/1` file and the node rebuilds it without a server. |
+| **ARDY Motion** | A second generator on NVIDIA ARDY's 27-joint Core skeleton: same timeline, root path and pose keys, 12 s of motion in about 4 s on an RTX 4090, sharing Kimodo's text encoder. |
 
 <!-- ARCHITECTURE -->
 ## Architecture
@@ -141,6 +142,24 @@ curl http://localhost:8001/health     # {"backend":"kimodo", ..., "mock_mode":fa
 ```
 
 On Windows, add a `.env` next to the compose file with `HF_HOME=C:/Users/<you>/.cache/huggingface` and `FXMOTION_ROOT=C:/Users/<you>/Documents/GitHub/fxhoudinimotion`; the compose file falls back to `$HOME`, which Windows does not set. Large weight downloads are faster on the host (`uv tool run --from huggingface_hub hf download ...`) than through the Docker bind mount.
+
+### ARDY server (optional)
+
+[NVIDIA ARDY](https://github.com/nv-tlabs/ardy) generates the same kind of motion on its own 27-joint Core skeleton, with the same timeline, root path and pose keys, through the **ARDY Motion** node. It runs natively in its own Python environment (no Docker) and borrows Kimodo's text-encoder container, so the Kimodo server above must be set up first; only its `text-encoder` service needs to run.
+
+```shell
+git clone https://github.com/nv-tlabs/ardy.git   # next to this repo
+cd ardy
+# create ARDY's .venv as its README says (Python 3.11, CUDA torch, `-e .`,
+# which builds a C++ extension: CMake + Visual Studio 2022 on Windows), then:
+uv pip install --python .venv fastapi uvicorn requests
+
+docker compose -f docker-compose.bridge.yaml up text-encoder -d   # from the kimodo dir
+scripts\run_ardy_server.ps1                                      # from this repo, port 8002
+curl http://localhost:8002/health     # {"backend":"ardy", ...}
+```
+
+The first start downloads the ARDY checkpoint (about 30 s). Stop the Kimodo `api` container when you only use ARDY: the text encoder is shared, the motion models are not.
 
 ### Houdini
 
@@ -303,6 +322,18 @@ Read by `docker-compose.bridge.yaml`:
 | `TEXT_ENCODERS_DIR` | — | Local folder of LLM2Vec adapters, when you cannot pull Meta's repo directly. |
 | `KIMODO_ENCODE_EST_S` | `30` | Starting guess, in seconds, for how long a segment spends encoding text. It only shapes the progress bar through the phase Kimodo reports nothing for. The server times the first encode it completes and uses that measurement from then on, including for later jobs, so this matters mainly for the very first generation after a restart. The default is the measured CPU figure. |
 | `TEXT_ENCODER_DEVICE` | `cpu` | Where the text encoder runs. `cpu` keeps VRAM free at the cost of ~14 GB of host RAM and the slowest part of every generation; `cuda` is much faster but wants roughly 14 GB of VRAM on top of the motion model. See [Where to run the text encoder](#where-to-run-the-text-encoder). |
+
+Read by the ARDY server (`scripts/run_ardy_server.ps1`):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ARDY_MODEL` | `ARDY-Core-RP-20FPS-Horizon40` | Checkpoint preloaded at start. |
+| `TEXT_ENCODER_URL` | `http://127.0.0.1:9550/` | The Kimodo text-encoder container ARDY uses. |
+| `OUTPUT_DIR` | `<system temp>/fxmotion/ardy` | Where the server caches clips. |
+| `MOCK_MODE` | `0` | `1` serves `FXMOTION_MOCK_CLIP` (an ARDY NPZ) without inference. |
+| `FXMOTION_IDLE_UNLOAD_S` | `0` | As for Kimodo. |
+
+The request option `history_s` (default 4) sets how many seconds of motion each ARDY step sees: shorter follows a prompt change sooner, with harder transitions.
 
 ### Where to run the text encoder
 

@@ -144,8 +144,9 @@ curl http://localhost:8001/health     # {"status":"ok","mock_mode":false}
 > Desktop on Windows). If 8001 is already in use, set `KIMODO_PORT` when starting the
 > api and point the node's **API Server URL** at the same port:
 > ```bash
-> KIMODO_PORT=8002 MOCK_MODE=0 docker compose -f docker-compose.bridge.yaml up api -d
-> # then in the HDA: API Server URL = http://localhost:8002
+> KIMODO_PORT=8003 MOCK_MODE=0 docker compose -f docker-compose.bridge.yaml up api -d
+> # then in the HDA: API Server URL = http://localhost:8003
+> # (8002 is the ARDY server's port)
 > ```
 
 ## 6. Houdini Python packages
@@ -194,3 +195,23 @@ Drop a **`kimodo_motion`** node in a SOP network:
 >
 > Developers who edit the cook scripts can rebuild the HDA:
 > `hython scripts/build_skin.py` → `hython scripts/build_hda.py` — see [houdini/README.md](../houdini/README.md#rebuilding-the-hda).
+
+## 8. ARDY server (optional)
+
+The **ARDY Motion** node talks to an ARDY server, which runs natively in ARDY's own
+Python environment and uses the Kimodo text-encoder container from step 5.
+
+1. Clone [nv-tlabs/ardy](https://github.com/nv-tlabs/ardy) next to this repo and create
+   its environment (Python 3.11, CUDA torch). `uv pip install -e .` builds a C++
+   extension: on Windows it needs CMake and Visual Studio 2022.
+2. Add the server's packages to that environment:
+   `uv pip install --python <ardy>/.venv/Scripts/python.exe fastapi uvicorn requests`.
+3. Start the text encoder (`docker compose -f docker-compose.bridge.yaml up text-encoder -d`
+   from the kimodo dir), then `scripts\run_ardy_server.ps1` from this repo. It listens
+   on port 8002 and stops with the install command if FastAPI is missing.
+4. `curl http://localhost:8002/health` answers `"backend":"ardy"`.
+
+VRAM: the text encoder is shared, the motion models are not. Stop the Kimodo `api`
+container (`docker stop kimodo-api`) when you only use ARDY.
+
+The server caches clips in the system temp folder (`fxmotion/ardy`).

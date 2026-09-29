@@ -121,3 +121,26 @@ None of the above grants any rights in these. Read each before use.
 
   QtPy, installed into vendor/ at setup time and not tracked in this repository
       MIT License
+
+  NVIDIA ARDY model weights, downloaded by ARDY itself
+      NVIDIA Open Model License
+      https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-agreement/
+
+  NVIDIA ARDY source (nv-tlabs/ardy), which the ARDY server imports but this
+  repository does not vendor
+      Apache License 2.0
+
+
+================================================================================
+4. Data derived from NVIDIA ARDY (Apache-2.0)
+================================================================================
+
+    houdini/python/fxmotion/skeletons/ardy_core.py
+    houdini/python/fxmotion/skeletons/data/ardy_core_skin.bgeo.sc
+    houdini/python/fxmotion/skeletons/data/ardy_core_apose.bgeo.sc
+    tests/fixtures/ardy_path.npz            (a motion generated with ARDY Core)
+
+The Core skeleton table and rest geometry are converted from the assets in ARDY's
+source repository (https://github.com/nv-tlabs/ardy, Copyright NVIDIA Corporation,
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0). ARDY's model
+weights are not part of this repository.

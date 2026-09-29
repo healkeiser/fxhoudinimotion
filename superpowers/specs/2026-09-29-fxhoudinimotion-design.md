@@ -279,3 +279,28 @@ Two more came out of the mid-phase review:
   variable to free VRAM between sessions.
 - Request times outside the clip (a root-path point or keyframe before 0 or
   past the last sample) are refused with a 422, rather than clamped.
+
+## 11. Addendum: phase 4 (ARDY), 2026-09-29
+
+- The skeleton is registered as `ardy_core` (ARDY's own folder: `cskel27`). Its rest
+  rotations are the identity: ARDY ships no T-pose offsets for Core, so its frames are
+  world-aligned at the joints.p T-pose. The skin's bind rotations reproduce its bind
+  translations over that T-pose, except the thumbs (skin bone 4.6 cm against 5.7 cm).
+- The ARDY server runs natively in ARDY's venv (port 8002) and uses the Kimodo
+  text-encoder container over HTTP.
+- No Regenerate on ARDY (`continue` off): ARDY continues from its own motion features.
+- Timelines are generated one horizon at a time, as ARDY's interactive demo does: each
+  chunk gets the last 4 s of motion as history (`options.history_s`), the prompt of its
+  segment, and one horizon of lookahead so it sees the keys just past it. Measured:
+  - the whole clip as history (the plan's first design) jittered past 10 s;
+  - without lookahead a two-segment seam jumped 0.48 m;
+  - with it: waypoints on a turning path 0.00 m off, a full-body key exact, a hand key
+    0.056 m off, steps around keys 0.99x ARDY's own single call, 12 s in 4.2 s;
+  - history length trades prompt-following against seams: a late wave was followed on
+    1 seed in 4 with 8 s of history, 3 in 4 with 4 s, 4 in 4 with 2 s (harder seams).
+- ARDY needs `cfg_weight=(text, constraint)`; a bare float gives constraints no
+  guidance and ARDY ignores every root path and pose key.
+- End-effector keys carry the Hips, which ARDY requires on every position-constrained
+  frame.
+- Key and waypoint times are clamped onto the last generated sample when they fall
+  inside the requested duration; only times past it are refused.
