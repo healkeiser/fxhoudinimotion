@@ -1,18 +1,20 @@
 # Kimodo inference server: the model is preloaded once at FastAPI startup and
 # inference runs in-process. The model stays resident in VRAM while the server
 # runs (stop the api container to free it). The kimodo_motion HDA fetches the
-# NPZ over HTTP, so the server can run on this machine or a remote GPU box.
+# clip over HTTP, so the server can run on this machine or a remote GPU box.
 #
 # Lives alongside Kimodo's own docker-compose.yaml in the kimodo repo, hence the
 # distinct filename — always pass it with -f.
 # Usage (on the GPU host, from the kimodo dir):
 #   MOCK_MODE=0 docker compose -f docker-compose.bridge.yaml up text-encoder -d  # wait until healthy
 #   MOCK_MODE=0 docker compose -f docker-compose.bridge.yaml up api -d
+# FXMOTION_ROOT must point at the fxhoudinimotion clone; the server code is mounted from it.
 # Shared between both services, so the HF cache mount and the GPU reservation cannot
 # drift apart (a second copy of the weights is a 10 GB mistake).
 x-workspace: &workspace
   - ./:/workspace
   - ${HF_HOME:-${HOME}/.cache/huggingface}:/workspace/.cache/huggingface
+  - ${FXMOTION_ROOT:?set FXMOTION_ROOT to your fxhoudinimotion clone}:/fxmotion:ro
 
 x-hf-env: &hf-env
   # TEXT_ENCODERS_DIR: the local McGill adapters, base repointed to the ungated
@@ -67,7 +69,7 @@ services:
     image: kimodo:1.0
     container_name: kimodo-api
     working_dir: /workspace
-    command: uvicorn kimodo_server:app --host 0.0.0.0 --port ${KIMODO_PORT:-8001}
+    command: uvicorn kimodo_backend:make_app --factory --host 0.0.0.0 --port ${KIMODO_PORT:-8001}
     volumes: *workspace
     ports:
       - "${KIMODO_PORT:-8001}:${KIMODO_PORT:-8001}"
@@ -76,6 +78,10 @@ services:
       KIMODO_MODEL: ${KIMODO_MODEL:-}   # model to preload at startup (blank = kimodo default)
       MOCK_MODE: ${MOCK_MODE:-0}        # 0 = live inference; 1 = serve dev_reference.npz
       OUTPUT_DIR: /workspace/output
+      # The server code is mounted from the fxhoudinimotion clone, not copied.
+      PYTHONPATH: /fxmotion/server:/fxmotion/houdini/python
+      # Free the model's VRAM after this many idle seconds (0 = keep it).
+      FXMOTION_IDLE_UNLOAD_S: ${FXMOTION_IDLE_UNLOAD_S:-0}
       TEXT_ENCODER_URL: "http://text-encoder:9550/"
       # Never "auto". Kimodo's auto mode probes the encoder and, on any failure,
       # silently loads its own copy of the 14 GB LLM2Vec instead, a second one on the
