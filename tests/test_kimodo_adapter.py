@@ -217,9 +217,9 @@ def test_times_outside_the_clip_are_refused():
     # 2.0 s -> samples 0..59
     late = [
         {"pos": [0.0, 0.0, 0.0], "time_s": 0.0},
-        {"pos": [0.0, 0.0, 1.0], "time_s": 2.5},
+        {"pos": [0.0, 0.0, 1.0], "time_s": 2.6},
     ]
-    with pytest.raises(ka.AdapterError, match="root_path time 2.5 s"):
+    with pytest.raises(ka.AdapterError, match="root_path time 2.6 s"):
         ka.kimodo_inputs(_req(root_path=late))
     clip = ka.to_clip(_npz(), ka.Canon())
     kf = {

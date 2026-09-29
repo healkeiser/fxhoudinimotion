@@ -13,6 +13,7 @@ PURE = [
     "fxmotion",
     "fxmotion.skeletons",
     "fxmotion.clipformat",
+    "diffusion_adapter",
     "kimodo_adapter",
     "fxmotion_server",
     "kimodo_backend",

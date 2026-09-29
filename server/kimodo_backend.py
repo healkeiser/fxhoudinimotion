@@ -15,6 +15,7 @@ import os
 import time
 from pathlib import Path
 
+import diffusion_adapter as da
 import numpy as np
 
 import fxmotion_server as fs
@@ -164,14 +165,6 @@ class _Sampler:
             self._encode()
 
 
-def _segments(inp: ka.KimodoInputs) -> list:
-    out, start = [], 0
-    for text, n in zip(inp.texts, inp.num_frames, strict=True):
-        out.append({"prompt": text, "start": start, "end": start + n - 1})
-        start += n
-    return out
-
-
 class KimodoBackend(fs.Backend):
     name = "kimodo"
     skeleton = "soma77"
@@ -268,7 +261,7 @@ class KimodoBackend(fs.Backend):
         return ka.to_clip(
             single,
             inp.canon,
-            segments=_segments(inp),
+            segments=da.segment_ranges(inp),
             source={"model": req.model or self.default_model, "seed": req.seed},
         )
 
@@ -284,7 +277,7 @@ class KimodoBackend(fs.Backend):
         return ka.to_clip(
             npz,
             inp.canon,
-            segments=_segments(inp),
+            segments=da.segment_ranges(inp),
             source={"model": "mock", "seed": req.seed},
         )
 
