@@ -181,7 +181,9 @@ def create_app(
     """The FastAPI app for one backend. `idle_unload_s` > 0 frees the model
     after that long without a job; `preload` loads the default model at
     startup (ignored in mock mode)."""
-    output_dir = Path(output_dir)
+    # Mock clips live apart from the real cache, so switching MOCK_MODE off
+    # never serves a mock clip as a cached result.
+    output_dir = Path(output_dir) / ("mock" if mock else "")
     output_dir.mkdir(parents=True, exist_ok=True)
     jobs: dict = {}
     tasks: set = set()  # asyncio keeps only weak references to tasks
@@ -199,6 +201,9 @@ def create_app(
         if state["loaded"] != model:
             if state["loaded"] is not None:
                 backend.unload()
+                # a load that raises below must not leave the old name
+                # standing for a model that is gone
+                state["loaded"] = None
             log.info("[LOAD] %s", model)
             backend.load(model)
             state["loaded"] = model
@@ -268,7 +273,7 @@ def create_app(
         job.update(status="running", progress=0.0)
         path = output_dir / ("%s.npz" % cache_key(req))
         try:
-            if not req.force and path.exists():
+            if not mock and not req.force and path.exists():
                 finish(job, path, cached=True)
                 return
             async with lock:

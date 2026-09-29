@@ -211,3 +211,22 @@ def test_continue_from_maps_the_native_keys():
     }
     with pytest.raises(ka.AdapterError, match="native_root_positions"):
         ka.kimodo_inputs(_req(continue_from={"native_local_rot_mats": [[1]]}))
+
+
+def test_times_outside_the_clip_are_refused():
+    # 2.0 s -> samples 0..59
+    late = [
+        {"pos": [0.0, 0.0, 0.0], "time_s": 0.0},
+        {"pos": [0.0, 0.0, 1.0], "time_s": 2.5},
+    ]
+    with pytest.raises(ka.AdapterError, match="root_path time 2.5 s"):
+        ka.kimodo_inputs(_req(root_path=late))
+    clip = ka.to_clip(_npz(), ka.Canon())
+    kf = {
+        "time_s": -0.5,
+        "world_pos": clip["world_pos"][0].tolist(),
+        "world_rot": clip["world_rot"][0].tolist(),
+        "joints": None,
+    }
+    with pytest.raises(ka.AdapterError, match="keyframe time -0.5 s"):
+        ka.kimodo_inputs(_req(keyframes=[kf]))

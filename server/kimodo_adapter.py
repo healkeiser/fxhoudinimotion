@@ -146,10 +146,24 @@ def to_clip(npz, canon: Canon, *, segments=None, source=None) -> dict:
     )
 
 
-def keyframe_constraints(keyframes, canon: Canon) -> list:
+def _check_sample(what, time_s, frames) -> int:
+    """The sample for `time_s`, refused if it falls outside a clip of
+    `frames` samples (None: no upper bound known)."""
+    f = sample(time_s)
+    if f < 0 or (frames is not None and f >= frames):
+        end = "" if frames is None else " to %g s" % ((frames - 1) / FPS)
+        raise AdapterError(
+            "kimodo: %s time %g s is outside the clip (0%s)"
+            % (what, float(time_s), end)
+        )
+    return f
+
+
+def keyframe_constraints(keyframes, canon: Canon, frames=None) -> list:
     """Request keyframes (Houdini space, KineFX rotations) as Kimodo
     fullbody-global / ee-global dicts in model space. Keys sharing the same
-    `joints` become one constraint, like 1.1's one per track."""
+    `joints` become one constraint, like 1.1's one per track. `frames`, the
+    clip length in samples, bounds the key times."""
     skel = skeletons.get("soma77")
     count = len(skel.joint_names)
     tp_t = np.swapaxes(_tpose(), -1, -2)
@@ -172,7 +186,7 @@ def keyframe_constraints(keyframes, canon: Canon) -> list:
         grot = np.swapaxes(rot, -1, -2) @ tp_t
         groups.setdefault(joints, []).append(
             (
-                sample(kf["time_s"]),
+                _check_sample("keyframe", kf["time_s"], frames),
                 canon.pos_to_model(pos),
                 canon.rot_to_model(grot),
             )
@@ -196,8 +210,9 @@ def keyframe_constraints(keyframes, canon: Canon) -> list:
     return out
 
 
-def _path_items(points, duration_s):
-    """[(sample, [x, z])], deduplicated by sample (first wins), sorted."""
+def _path_items(points, duration_s, frames):
+    """[(sample, [x, z])], deduplicated by sample (first wins), sorted.
+    `frames`, the clip length in samples, bounds timed points."""
     timed = [p.get("time_s") is not None for p in points]
     if any(timed) and not all(timed):
         raise AdapterError(
@@ -205,15 +220,15 @@ def _path_items(points, duration_s):
         )
     xz = [[float(p["pos"][0]), float(p["pos"][2])] for p in points]
     if all(timed):
-        frames = [sample(p["time_s"]) for p in points]
+        at = [_check_sample("root_path", p["time_s"], frames) for p in points]
     elif len(xz) > 1:
         # spread evenly over the clip, as 1.1 did
         last = max(2, int(duration_s * FPS)) - 1
-        frames = [int(round(i * last / (len(xz) - 1))) for i in range(len(xz))]
+        at = [int(round(i * last / (len(xz) - 1))) for i in range(len(xz))]
     else:
-        frames = [0]
+        at = [0]
     by_frame: dict = {}
-    for f, c in zip(frames, xz, strict=True):
+    for f, c in zip(at, xz, strict=True):
         by_frame.setdefault(f, c)
     return sorted(by_frame.items())
 
@@ -245,8 +260,10 @@ def kimodo_inputs(req: dict) -> KimodoInputs:
     if not texts:
         raise AdapterError("kimodo: at least one segment is required")
     opts = req.get("options") or {}
+    num_frames = [max(1, int(d * FPS)) for d in durs]
+    total = sum(num_frames)
     root_path = req.get("root_path") or []
-    items = _path_items(root_path, sum(durs)) if root_path else []
+    items = _path_items(root_path, sum(durs), total) if root_path else []
     if opts.get("canon") is not None:
         canon = Canon(*(float(v) for v in opts["canon"]))
     elif items:
@@ -268,7 +285,9 @@ def kimodo_inputs(req: dict) -> KimodoInputs:
                 ],
             }
         )
-    constraints += keyframe_constraints(req.get("keyframes") or [], canon)
+    constraints += keyframe_constraints(
+        req.get("keyframes") or [], canon, total
+    )
     cont = None
     cf = req.get("continue_from")
     if cf:
@@ -285,7 +304,7 @@ def kimodo_inputs(req: dict) -> KimodoInputs:
     return KimodoInputs(
         texts=texts,
         durations_s=durs,
-        num_frames=[max(1, int(d * FPS)) for d in durs],
+        num_frames=num_frames,
         constraints=constraints,
         canon=canon,
         transition_frames=max(1, int(opts.get("transition_frames", 5))),

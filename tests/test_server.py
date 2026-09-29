@@ -201,3 +201,33 @@ def test_mock_mode_never_loads_a_model(tmp_path):
         st = wait(client, submit(client))
         assert st["frames"] == 2 and backend.loaded == []
         assert client.get("/health").json()["mock_mode"] is True
+
+
+def test_a_failed_load_does_not_leave_a_dead_model(server):
+    client, backend, _ = server
+    wait(client, submit(client))  # m1 loaded
+    real_load = backend.load
+
+    def load(model):
+        if model == "m2":
+            raise RuntimeError("out of memory")
+        real_load(model)
+
+    backend.load = load
+    st = wait(client, submit(client, dict(REQ, model="m2")))
+    assert st["status"] == "failed" and "out of memory" in st["error"]
+    assert client.get("/health").json()["loaded_model"] is None
+    st = wait(client, submit(client, dict(REQ, force=True)))
+    assert st["status"] == "done"
+    assert backend.loaded == ["m1", "m1"]  # reloaded, not assumed
+
+
+def test_mock_clips_never_reach_the_real_cache(tmp_path):
+    _, mock_app = _serve(tmp_path, mock=True)
+    with TestClient(mock_app) as client:
+        assert wait(client, submit(client))["frames"] == 2
+    backend, app = _serve(tmp_path)
+    with TestClient(app) as client:
+        st = wait(client, submit(client))
+    assert st["cached"] is False and st["frames"] == 4
+    assert len(backend.calls) == 1
