@@ -22,3 +22,6 @@ backup/
 # Anchored to root so the copies embedded under houdini/otls/ stay tracked.
 /skin.bgeo.sc
 /apose.bgeo.sc
+
+# Throwaway MotionBricks spike (phase 0): run from a MotionBricks venv, never shipped.
+/scripts/motionbricks_*.py
