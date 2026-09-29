@@ -52,9 +52,7 @@ def test_to_clip_is_valid_and_keeps_contacts_native_and_canon():
     assert str(clip["skeleton"]) == "soma77" and float(clip["fps"]) == 30.0
     names = [str(n) for n in clip["joint_names"]]
     left = names.index("LeftFoot")
-    assert np.array_equal(
-        clip["contacts"][:, left], npz["foot_contacts"][:, 0]
-    )
+    assert np.array_equal(clip["contacts"][:, left], npz["foot_contacts"][:, 0])
     for key in ka.NATIVE_KEYS:
         assert np.array_equal(clip["native_" + key], npz[key])
     src = clipformat.meta(clip, "source")

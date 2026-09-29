@@ -154,6 +154,6 @@ class Timeline:
 
     def request_segments(self, fps: float) -> list[dict]:
         return [
-            {"prompt": s.prompt.strip(), "duration": s.frames / float(fps)}
+            {"prompt": s.prompt.strip(), "duration_s": s.frames / float(fps)}
             for s in self.segments
         ]

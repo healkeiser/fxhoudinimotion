@@ -18,8 +18,9 @@ import tokenize
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PKG = HERE.parent / "houdini" / "python" / "kimodo_timeline"
-HDA_SRC = HERE.parent / "scripts" / "create_hda.py"
+FX = HERE.parent / "houdini" / "python" / "fxmotion"
+PKG = FX / "timeline"
+NODES = FX / "nodes"
 
 
 def _read(path):
@@ -79,7 +80,7 @@ def _modules():
     """Every panel module, comments and docstrings blanked. Use _read for raw
     source.
     """
-    for path in sorted(PKG.glob("*.py")):
+    for path in sorted([*PKG.glob("*.py"), FX / "poller.py", FX / "qt.py"]):
         yield path.name, _code(_read(path))
 
 
@@ -170,9 +171,10 @@ def test_no_interruptable_operation_in_the_panel():
         assert "InterruptableOperation" not in src, (
             "%s must not block on an operation" % name
         )
-    assert "InterruptableOperation" not in _code(_read(HDA_SRC)), (
-        "the HDA callback must not either"
-    )
+    for path in sorted(NODES.glob("*.py")):
+        assert "InterruptableOperation" not in _code(_read(path)), (
+            "%s must not block on an operation" % path.name
+        )
 
 
 def test_nothing_sleeps():
@@ -180,9 +182,10 @@ def test_nothing_sleeps():
     callback replaced every poll loop that used to."""
     for name, src in _modules():
         assert "time.sleep" not in src, "%s must not sleep" % name
-    assert "time.sleep" not in _code(_read(HDA_SRC)), (
-        "the HDA callback must not sleep"
-    )
+    for path in sorted(NODES.glob("*.py")):
+        assert "time.sleep" not in _code(_read(path)), (
+            "%s must not sleep" % path.name
+        )
 
 
 def test_only_the_shim_names_a_qt_binding():
@@ -297,7 +300,7 @@ def test_status_text_is_always_elided():
 def test_source_is_ascii():
     """Escapes, not literal glyphs, so the files survive any encoding they pass
     through. Raw source on purpose: a stray glyph in a comment counts."""
-    for path in sorted(PKG.glob("*.py")):
+    for path in sorted(FX.rglob("*.py")):
         src = _read(path)
         bad = [
             (i + 1, line)
@@ -313,7 +316,7 @@ def test_source_is_ascii():
 def test_poller_never_touches_hou_ui_at_import():
     """hou.ui does not exist in hython. The module must import there and refuse
     politely only when something actually tries to start a watch."""
-    src = _read(PKG / "poller.py")
+    src = _read(FX / "poller.py")
     tree = ast.parse(src)
 
     def is_docstring(n):
@@ -345,11 +348,9 @@ def test_a_precondition_is_a_warning_not_an_error():
     because the cook script turns last_error into a hou.NodeError and reddens
     the node.
     """
-    hda = _read(HDA_SRC)  # run_regenerate lives in an embedded script string
-    start = hda.index("\ndef run_regenerate(")
     for src, fn in (
         (_code(_read(PKG / "widget.py")), "_regen"),
-        (hda[start : hda.index("\ndef ", start + 1)], "run_regenerate"),
+        (_code(_read(NODES / "timeline_parms.py")), "run_regenerate"),
     ):
         caught = [
             ast.unparse(h)

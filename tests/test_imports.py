@@ -19,6 +19,8 @@ PURE = [
     "fxmotion.clip",
     "fxmotion.client",
     "fxmotion.paths",
+    "fxmotion.timeline.model",
+    "fxmotion.timeline.regen",
 ]
 
 

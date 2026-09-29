@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pythonPanelDocument>
+  <!-- Motion Timeline: prompt segments and pose tracks for fxmotion generator
+       nodes. The widget code lives in houdini/python/fxmotion/timeline (on
+       PYTHONPATH via the fxhoudinimotion package). -->
+  <interface name="fxmotion_timeline" label="Motion Timeline" icon="NVIDIA_badge.svg" showNetworkNavigationBar="false" help_url="">
+    <script><![CDATA[
+def onCreateInterface():
+    from fxmotion import timeline
+    return timeline.create_widget()
+]]></script>
+    <includeInToolbarMenu menu_position="0" create_separator="false"/>
+  </interface>
+</pythonPanelDocument>

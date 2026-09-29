@@ -14,9 +14,9 @@ import html
 
 import hou
 
+from ..qt import QtCore, QtGui, QtWidgets, event_pos, run_exec
 from . import bridge
 from .model import MIN_FRAMES, TRACK_LABELS, TRACKS, Timeline
-from .qt import QtCore, QtGui, QtWidgets, event_pos, run_exec
 
 ###### Layout constants (pixels)
 GUTTER = 78  # track labels

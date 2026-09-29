@@ -6,13 +6,18 @@ import hou
 
 from .model import Timeline
 
-TYPE_PREFIX = "vb::kimodo_motion"
+# Node types the panel edits. 1.1 is left out: it can no longer Generate.
+TIMELINE_TYPES = ("vb::kimodo_motion::2.0",)
+
+
+def _is_timeline_node(n) -> bool:
+    return n is not None and n.type().name() in TIMELINE_TYPES
 
 
 def find_node():
     """First selected Kimodo Motion node, or None."""
     for n in hou.selectedNodes():
-        if n.type().name().startswith(TYPE_PREFIX):
+        if _is_timeline_node(n):
             return n
     return None
 
@@ -21,7 +26,7 @@ def all_nodes():
     """Every Kimodo Motion node in the scene, sorted by path."""
     out = []
     for name, nt in hou.sopNodeTypeCategory().nodeTypes().items():
-        if name.startswith(TYPE_PREFIX):
+        if name in TIMELINE_TYPES:
             out.extend(nt.instances())
     return sorted(out, key=lambda n: n.path())
 
@@ -29,9 +34,7 @@ def all_nodes():
 def node_at(path):
     """The Kimodo Motion node at `path`, or None."""
     n = hou.node(path) if path else None
-    return (
-        n if n is not None and n.type().name().startswith(TYPE_PREFIX) else None
-    )
+    return n if _is_timeline_node(n) else None
 
 
 def load(node) -> Timeline:
@@ -46,7 +49,7 @@ def load(node) -> Timeline:
     )
 
 
-def save(node, tl: Timeline, label: str = "Kimodo timeline edit") -> None:
+def save(node, tl: Timeline, label: str = "Motion timeline edit") -> None:
     """Write the timeline back as one undoable step. Duration mirrors the total
     so the node reads right even with the panel closed; Pose Keyframes mirrors
     the Full Body track so legacy readers still see something sensible."""
@@ -59,7 +62,9 @@ def save(node, tl: Timeline, label: str = "Kimodo timeline edit") -> None:
             " ".join(str(k) for k in tl.tracks.get("fullbody", []))
         )
         # keep the node's Segments multiparm showing the same thing
-        node.type().hdaModule().rebuild_segments(node)
+        from ..nodes import timeline_parms
+
+        timeline_parms.rebuild_segments(node)
 
 
 def start_frame(node) -> int:

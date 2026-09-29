@@ -1,4 +1,4 @@
-"""Checks for kimodo_timeline.model. Plain python: python
+"""Checks for fxmotion.timeline.model. Plain python: python
 tests/test_timeline_model.py
 """
 
@@ -9,7 +9,7 @@ sys.path.insert(
     0, str(Path(__file__).resolve().parents[1] / "houdini" / "python")
 )
 
-from kimodo_timeline.model import TRACKS, Segment, Timeline  # noqa: E402
+from fxmotion.timeline.model import TRACKS, Segment, Timeline  # noqa: E402
 
 
 def test_totals_and_starts():
@@ -17,8 +17,8 @@ def test_totals_and_starts():
     assert tl.total_frames == 120
     assert tl.starts(1) == [1, 73]
     assert tl.request_segments(30) == [
-        {"prompt": "walk", "duration": 2.4},
-        {"prompt": "box", "duration": 1.6},
+        {"prompt": "walk", "duration_s": 2.4},
+        {"prompt": "box", "duration_s": 1.6},
     ]
 
 

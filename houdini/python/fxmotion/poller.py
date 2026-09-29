@@ -1,4 +1,4 @@
-"""Watch a Kimodo job from Houdini's event loop, without blocking anything.
+"""Watch a model-server job from Houdini's event loop, without blocking anything.
 
 This is how SideFX's own code does repeated work: hou.ui.addEventLoopCallback
 runs the callback once per event-loop iteration, and hdefereval is built on it.
@@ -17,8 +17,8 @@ import contextlib
 import time
 
 import hou
-import requests
 
+from . import client
 from .qt import QtWidgets
 
 # Seconds between server queries; the callback itself runs far more often.
@@ -62,7 +62,7 @@ class JobDialog(QtWidgets.QDialog):
             "Cancel the job on the server."
             + "\n"
             + "Closing this window only hides it: the job keeps running and "
-            "the Kimodo Timeline panel keeps showing its progress."
+            "the Motion Timeline panel keeps showing its progress."
         )
         self.btn.clicked.connect(self._request_cancel)
         row.addWidget(self.btn)
@@ -103,9 +103,9 @@ class JobWatcher:
         # from without one. Say so rather than dying on an AttributeError.
         if not hou.isUIAvailable():
             raise hou.OperationFailed(
-                "Kimodo polls the job from Houdini's event loop, which needs a UI session."
+                "fxmotion polls the job from Houdini's event loop, which needs a UI session."
             )
-        self.dlg = JobDialog("Kimodo")
+        self.dlg = JobDialog(self.node.type().description())
         self.dlg.report(0.0, self.label)
         self.dlg.show()  # not exec(): nothing blocks, nothing nests
         hou.ui.addEventLoopCallback(self._tick)
@@ -127,7 +127,8 @@ class JobWatcher:
         self.node.parm("job_id").set("")
         if hou.isUIAvailable():
             hou.ui.setStatusMessage(
-                "Kimodo: %s" % msg, severity=hou.severityType.Error
+                "%s: %s" % (self.node.type().description(), msg),
+                severity=hou.severityType.Error,
             )
 
     ###### The callback
@@ -150,23 +151,19 @@ class JobWatcher:
             self.stop()  # a newer Generate replaced us
             return
         if self.dlg is not None and self.dlg.cancel_requested:
-            requests.post(
-                "%s/jobs/%s/cancel" % (self.url, self.job_id), timeout=10
-            )
+            client.cancel(self.url, self.job_id)
             self.node.parm("status").set("Cancelling...")
             self.dlg.cancel_requested = (
                 False  # let the server report it back as cancelled
             )
             return
         try:
-            r = requests.get("%s/jobs/%s" % (self.url, self.job_id), timeout=10)
-            if r.status_code == 404:
+            data = client.job(self.url, self.job_id)
+            self._fails = 0
+        except client.ServerError as e:
+            if e.status == 404:
                 self.fail("Job lost (server restarted?)")
                 return
-            r.raise_for_status()
-            data = r.json()
-            self._fails = 0
-        except requests.RequestException as e:
             self._fails += 1
             self.node.parm("status").set(
                 "Poll error (%d/%d): %s" % (self._fails, MAX_FAILS, e)

@@ -23,8 +23,9 @@ confirm. Use trace() in that script.
 import gc
 
 import hou
-from kimodo_timeline import model, widget
-from kimodo_timeline.qt import QtCore, QtWidgets
+
+from fxmotion.qt import QtCore, QtWidgets
+from fxmotion.timeline import model, widget
 
 
 def _app():
@@ -160,7 +161,7 @@ def test_real_context_menu_does_not_leak():
     time. Driving the real handler and letting the local fall out of scope is
     the only version that measures our code.
     """
-    from kimodo_timeline.qt import QtGui
+    from fxmotion.qt import QtGui
 
     c = _canvas()
     c.resize(600, 200)
@@ -233,7 +234,7 @@ def test_no_mouse_event_escapes_the_canvas():
                 )
             return False
 
-    from kimodo_timeline.qt import QtGui
+    from fxmotion.qt import QtGui
 
     host = QtWidgets.QWidget()  # stands in for Houdini's pane
     c = widget.Canvas(host)
