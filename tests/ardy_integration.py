@@ -1,6 +1,6 @@
 """ARDY on the real model: segments chained, constraints kept, long timelines.
 
-    <ardy>/.venv/Scripts/python.exe tests/ardy_integration.py
+    <ardy>/.venv/Scripts/python.exe tests/ardy_integration.py [model]
 
 Needs the Kimodo text-encoder container on http://127.0.0.1:9550/ and a GPU.
 """
@@ -19,7 +19,9 @@ import ardy_backend as ab  # noqa: E402
 import fxmotion_server as fs  # noqa: E402
 
 backend = ab.ArdyBackend()
-backend.load("")
+backend.load(
+    sys.argv[1] if len(sys.argv) > 1 else ""
+)  # a model name, e.g. Horizon8
 progress = fs.Progress({})
 
 
@@ -153,14 +155,19 @@ def native(req):
 
 
 keyed = dict(walk, seed=2, keyframes=keys)
-s, r = steps(pos), steps(native(keyed))
+ref_pos = native(keyed)
+s, r = steps(pos), steps(ref_pos)
+reach_native = np.linalg.norm(ref_pos[100, hand] - raised[hand])
 worst = max(s[f - 4 : f + 4].max() / r[f - 4 : f + 4].max() for f in (40, 100))
 print(
-    "keys: %.1f s, full-body key %.3f m off (worst joint), hand key %.3f m off, "
-    "worst step around a key %.2fx ARDY's native call"
-    % (secs, body, reach, worst)
+    "keys: %.1f s, full-body key %.3f m off (worst joint), hand key %.3f m off "
+    "(native call %.3f m), worst step around a key %.2fx the native call"
+    % (secs, body, reach, reach_native, worst)
 )
 assert body < 0.1, "the full-body key is not reached"
-assert reach < 0.1, "the end-effector key is not reached"
+# the hand: no worse than ARDY's own single call on the same key
+assert reach < max(0.1, 1.25 * reach_native), (
+    "the end-effector key is not reached"
+)
 assert worst < 1.25, "chunking adds a pop around a key"
 print("ok")

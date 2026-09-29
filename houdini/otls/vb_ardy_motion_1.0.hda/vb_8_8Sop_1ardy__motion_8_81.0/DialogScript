@@ -58,7 +58,7 @@
             label   "Model"
             type    ordinal
             default { "0" }
-            help    "__Horizon40__ generates 2 s per step (smoother); __Horizon8__ 0.4 s per step (more reactive to constraints)."
+            help    "__Horizon40__, the default: faster, and closer to hand and foot keys. __Horizon8__ plans 0.4 s at a time inside each step; measured here about 3x slower and looser on hand keys."
             menu {
                 "ARDY-Core-RP-20FPS-Horizon40"  "ARDY-Core-RP-20FPS-Horizon40"
                 "ARDY-Core-RP-20FPS-Horizon8"   "ARDY-Core-RP-20FPS-Horizon8"

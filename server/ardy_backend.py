@@ -6,7 +6,7 @@ TEXT_ENCODER_MODE=api), so the two models share one copy. Every torch and
 ardy import is inside a method: the module imports, and the MOCK_MODE server
 runs, without them.
 
-The timeline is generated one horizon at a time, like ARDY's interactive
+The timeline is generated two seconds at a time, like ARDY's interactive
 demo: each chunk sees the last few seconds of motion as
 init_history_sequence (HISTORY_S) and the prompt of the segment it falls in. A whole
 clip as history would outgrow ARDY's trained 10 s window and jitter (ARDY
@@ -42,21 +42,19 @@ WINDOW_S = 10.0
 HISTORY_S = 4.0
 
 
-def history_frames(
-    fps: float, horizon: int, token: int, seconds=HISTORY_S
-) -> int:
+def history_frames(fps: float, step: int, token: int, seconds=HISTORY_S) -> int:
     """History frames for `seconds`, in whole tokens, at least one token and
-    at most what fits the trained window next to one horizon (the bound of
-    scripts/generate.py's _default_history_frames)."""
+    at most what fits the trained window next to one chunk of `step` frames
+    (scripts/generate.py's _default_history_frames, with one horizon)."""
     window = (int(WINDOW_S * fps) // token) * token
-    most = ((window - horizon) // token) * token
+    most = ((window - step) // token) * token
     want = (int(round(float(seconds) * fps)) // token) * token
     return min(most, max(token, want))
 
 
-def chunks(num_frames, horizon: int, token: int) -> list:
+def chunks(num_frames, step: int, token: int) -> list:
     """[(segment index, first frame, frame count)]: each segment cut into
-    pieces of at most one horizon. ARDY reads a history in whole tokens, so
+    pieces of at most `step` frames. ARDY reads a history in whole tokens, so
     the segment boundaries inside the clip move to the nearest token (a
     segment shorter than half a token disappears) and every chunk but the
     last is a whole number of tokens."""
@@ -68,8 +66,8 @@ def chunks(num_frames, horizon: int, token: int) -> list:
     ends.append(total)
     out, start = [], 0
     for k, end in enumerate(ends):
-        for s in range(start, end, horizon):
-            out.append((k, s, min(horizon, end - s)))
+        for s in range(start, end, step):
+            out.append((k, s, min(step, end - s)))
         start = max(start, end)
     return out
 
@@ -78,18 +76,26 @@ def chunks(num_frames, horizon: int, token: int) -> list:
 # means text guidance only: ARDY then ignores root paths and pose keys.
 CFG_WEIGHT = (2.0, 2.0)
 
-# Each chunk also generates up to one more horizon, so it sees the pose keys
-# and waypoints just past it (ARDY's own calls see the whole clip's); the
-# extra frames are dropped and generated again by the next chunk.
+# Each chunk is STEP_S of motion and also generates up to STEP_S more, so it
+# sees the pose keys and waypoints just past it (ARDY's own calls see the
+# whole clip's); the extra frames are dropped and generated again by the
+# next chunk.
+STEP_S = 2.0
 LOOKAHEAD = True
 
 
+def step_frames(fps: float, horizon: int, seconds=STEP_S) -> int:
+    """Chunk length: `seconds` in whole model horizons, at least one."""
+    return max(1, int(round(seconds * fps / horizon))) * horizon
+
+
 def lookahead(
-    history: int, n: int, horizon: int, window: int, remaining: int
+    history: int, n: int, step: int, horizon: int, window: int, remaining: int
 ) -> int:
-    """Frames generated past a chunk: one horizon, within the trained window
-    and the clip."""
-    return max(0, min(horizon, window - history - n, remaining))
+    """Frames generated past a chunk: up to one step, within the clip and,
+    once ARDY pads to whole horizons, within the trained window."""
+    room = (window - history - n) // horizon * horizon
+    return max(0, min(step, room, remaining))
 
 
 def encode_prompts(encode, texts, url) -> dict:
@@ -251,14 +257,15 @@ class ArdyBackend(fs.Backend):
         steps = int(model.diffusion.num_base_steps)
         horizon = int(model.gen_horizon_len)
         token = int(model.num_frames_per_token)
+        step = step_frames(ARDY.fps, horizon)
         keep = history_frames(
-            ARDY.fps, horizon, token, req.options.get("history_s", HISTORY_S)
+            ARDY.fps, step, token, req.options.get("history_s", HISTORY_S)
         )
         window_frames = (int(WINDOW_S * ARDY.fps) // token) * token
         texts = encode_prompts(
             model._encode_text, inp.texts, self.text_encoder_url
         )
-        plan = chunks(inp.num_frames, horizon, token)
+        plan = chunks(inp.num_frames, step, token)
         motion = None
         for i, (k, start, n) in enumerate(plan):
             progress.set(
@@ -267,7 +274,7 @@ class ArdyBackend(fs.Backend):
             hist = None if motion is None else motion[:, -keep:]
             h = 0 if hist is None else hist.shape[1]
             la = (
-                lookahead(h, n, horizon, window_frames, total - start - n)
+                lookahead(h, n, step, horizon, window_frames, total - start - n)
                 if LOOKAHEAD
                 else 0
             )

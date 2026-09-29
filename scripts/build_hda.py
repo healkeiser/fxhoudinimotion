@@ -166,8 +166,9 @@ SPECS = {
             "ARDY-Core-RP-20FPS-Horizon40",
             "ARDY-Core-RP-20FPS-Horizon8",
         ),
-        "model_help": "__Horizon40__ generates 2 s per step (smoother); "
-        "__Horizon8__ 0.4 s per step (more reactive to constraints).",
+        "model_help": "__Horizon40__, the default: faster, and closer to "
+        "hand and foot keys. __Horizon8__ plans 0.4 s at a time inside each "
+        "step; measured here about 3x slower and looser on hand keys.",
         "prompt_help": ARDY_PROMPT_HELP,
         "help": ARDY_HELP,
         "server": "http://localhost:8002",

@@ -155,13 +155,23 @@ def test_prompts_are_encoded_once_each():
     assert got == {"a": "A", "b": "B"} and seen == [["a"], ["b"]]
 
 
+def test_steps_are_two_seconds_of_whole_horizons():
+    # Horizon8 used to step (and look ahead) 0.4 s at a time
+    assert ab.step_frames(20.0, 40) == 40
+    assert ab.step_frames(20.0, 8) == 40
+    assert ab.step_frames(20.0, 52) == 52  # never less than one horizon
+
+
 def test_lookahead_fits_the_window_and_the_clip():
-    # 80 history + 40 chunk leave room for one more horizon of 40
-    assert ab.lookahead(80, 40, 40, 200, 500) == 40
+    # lookahead(history, chunk, step, horizon, window, frames left)
+    assert ab.lookahead(80, 40, 40, 40, 200, 500) == 40
+    assert ab.lookahead(80, 40, 40, 8, 200, 500) == 40
     # history 160 + 40: the 200-frame window is full
-    assert ab.lookahead(160, 40, 40, 200, 500) == 0
+    assert ab.lookahead(160, 40, 40, 40, 200, 500) == 0
     # the clip ends 12 frames after this chunk
-    assert ab.lookahead(80, 40, 40, 200, 12) == 12
+    assert ab.lookahead(80, 40, 40, 40, 200, 12) == 12
+    # ARDY pads to whole horizons: 140 + 40 leaves 20, not a whole horizon
+    assert ab.lookahead(140, 40, 40, 40, 200, 500) == 0
 
 
 def test_end_effector_sets_carry_the_hips():
