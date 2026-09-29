@@ -50,8 +50,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install pytest
-        run: pip install pytest
+      - name: Install test dependencies
+        # numpy for the clip format, fastapi + httpx for the server tests
+        # (TestClient), requests for fxmotion.client.
+        run: pip install pytest numpy requests fastapi httpx
 
       - name: Tests
         run: pytest -q

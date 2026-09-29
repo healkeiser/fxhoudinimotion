@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-PURE = ["fxmotion", "fxmotion.skeletons", "fxmotion.clipformat", "kimodo_adapter"]
+PURE = [
+    "fxmotion",
+    "fxmotion.skeletons",
+    "fxmotion.clipformat",
+    "kimodo_adapter",
+    "fxmotion_server",
+]
 
 
 @pytest.mark.parametrize("module", PURE)
