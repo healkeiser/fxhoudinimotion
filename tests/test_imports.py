@@ -17,6 +17,8 @@ PURE = [
     "fxmotion_server",
     "kimodo_backend",
     "fxmotion.clip",
+    "fxmotion.client",
+    "fxmotion.paths",
 ]
 
 
