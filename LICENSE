@@ -1,4 +1,4 @@
-fxhoudinikimodo is covered by two different sets of terms, because it is a fork of
+fxhoudinimotion is covered by two different sets of terms, because it is a fork of
 chordee/kimodo-houdini-bridge and still contains that project's code.
 
 Read section 2 before assuming this repository is open source. It is not, taken as a
@@ -15,7 +15,7 @@ Applies to every file NOT listed in section 2, in particular:
     .github/
     CONTRIBUTING.md
     docs/timeline-design.md
-    fxhoudinikimodo.json
+    fxhoudinimotion.json
     houdini/README.md
     houdini/python/kimodo_timeline/
     houdini/python_panels/kimodo_timeline.pypanel

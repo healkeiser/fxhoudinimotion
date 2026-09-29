@@ -165,7 +165,7 @@ def run_regenerate(node, index, to_end=False):
         from kimodo_timeline import regen
     except ImportError:
         node.parm("last_error").set(
-            "Regenerate needs houdini/python on PYTHONPATH (the fxhoudinikimodo package).")
+            "Regenerate needs houdini/python on PYTHONPATH (the fxhoudinimotion package).")
         raise
     try:
         msg = regen.regenerate(node, index, to_end=to_end)
@@ -580,7 +580,7 @@ else:
     try:
         from kimodo_timeline.poller import JobWatcher
     except ImportError:
-        fail("Generate needs houdini/python on PYTHONPATH (the fxhoudinikimodo package).")
+        fail("Generate needs houdini/python on PYTHONPATH (the fxhoudinimotion package).")
     else:
         JobWatcher(node, url, job_id, "Running", _finish).start()
         if hou.isUIAvailable():
@@ -746,7 +746,7 @@ for pt in hou.ui.paneTabs():          # hou.ui.paneTabs() includes floating pane
 if tab is None:
     iface = hou.pypanel.interfaceByName("kimodo_timeline")
     if iface is None:
-        node.parm("last_error").set("Kimodo Timeline panel not found: is houdini/python_panels on HOUDINI_PATH (fxhoudinikimodo package)?")
+        node.parm("last_error").set("Kimodo Timeline panel not found: is houdini/python_panels on HOUDINI_PATH (fxhoudinimotion package)?")
         hou.ui.setStatusMessage("Kimodo: Timeline panel not found (see node error).", severity=hou.severityType.Error)
     else:
         tab = desk.createFloatingPaneTab(hou.paneTabType.PythonPanel, size=(1100, 420))

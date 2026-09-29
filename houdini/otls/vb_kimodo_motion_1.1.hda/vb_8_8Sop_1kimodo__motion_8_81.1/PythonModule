@@ -260,7 +260,7 @@ def run_regenerate(node, index, to_end=False):
         from kimodo_timeline import regen
     except ImportError:
         node.parm("last_error").set(
-            "Regenerate needs houdini/python on PYTHONPATH (the fxhoudinikimodo package).")
+            "Regenerate needs houdini/python on PYTHONPATH (the fxhoudinimotion package).")
         raise
     try:
         msg = regen.regenerate(node, index, to_end=to_end)

@@ -62,8 +62,8 @@ Copy the two bridge files in — the compose file has a distinct name so it sits
 to Kimodo's own `docker-compose.yaml`:
 
 ```bash
-cp /path/to/fxhoudinikimodo/kimodo_server.py .
-cp /path/to/fxhoudinikimodo/docker-compose.bridge.yaml .
+cp /path/to/fxhoudinimotion/kimodo_server.py .
+cp /path/to/fxhoudinimotion/docker-compose.bridge.yaml .
 mkdir -p output
 export HUGGING_FACE_HUB_TOKEN=$(cat ~/.cache/huggingface/token)   # or paste your hf_... token
 ```

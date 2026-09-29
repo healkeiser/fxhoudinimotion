@@ -276,9 +276,9 @@ Copy the package file to your Houdini packages directory, then edit
 
 ```bash
 # Windows
-copy fxhoudinikimodo.json %HOUDINI_USER_PREF_DIR%\packages\
+copy fxhoudinimotion.json %HOUDINI_USER_PREF_DIR%\packages\
 # Linux / macOS
-cp fxhoudinikimodo.json ~/houdiniXX.Y/packages/
+cp fxhoudinimotion.json ~/houdiniXX.Y/packages/
 ```
 
 Restart Houdini — the **Kimodo Motion** SOP appears in the Tab menu under **Kimodo**.

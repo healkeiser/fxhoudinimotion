@@ -1,5 +1,5 @@
 # Tool configuration only. Nothing here is installable: the Houdini half is
-# put on PYTHONPATH by fxhoudinikimodo.json, and kimodo_server.py runs inside
+# put on PYTHONPATH by fxhoudinimotion.json, and kimodo_server.py runs inside
 # the kimodo:1.0 image from docker-compose.bridge.yaml. A [project] table
 # would describe a package that no one pip installs.
 

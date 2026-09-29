@@ -4,7 +4,7 @@
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="https://cdn.simpleicons.org/nvidia/76B900" alt="NVIDIA" width="80">
 
-  <h3 align="center">fxhoudinikimodo</h3>
+  <h3 align="center">fxhoudinimotion</h3>
 
   <p align="center">
     NVIDIA Kimodo text-to-motion inside SideFX Houdini.
@@ -21,12 +21,12 @@
     <!-- License -->
     <img src="https://img.shields.io/badge/License-MIT%20%2B%20upstream%20terms-blue.svg?&logoColor=white" alt="License: MIT + upstream terms"/>&nbsp;&nbsp;
     <!-- Last Commit -->
-    <img src="https://img.shields.io/github/last-commit/healkeiser/fxhoudinikimodo?logo=github&label=Last%20Commit" alt="Last Commit"/>&nbsp;&nbsp;
+    <img src="https://img.shields.io/github/last-commit/healkeiser/fxhoudinimotion?logo=github&label=Last%20Commit" alt="Last Commit"/>&nbsp;&nbsp;
     <!-- Commit Activity -->
-    <a href="https://github.com/healkeiser/fxhoudinikimodo/pulse" alt="Activity">
-      <img src="https://img.shields.io/github/commit-activity/m/healkeiser/fxhoudinikimodo?&logo=github&label=Commit%20Activity"/></a>&nbsp;&nbsp;
+    <a href="https://github.com/healkeiser/fxhoudinimotion/pulse" alt="Activity">
+      <img src="https://img.shields.io/github/commit-activity/m/healkeiser/fxhoudinimotion?&logo=github&label=Commit%20Activity"/></a>&nbsp;&nbsp;
     <!-- GitHub stars -->
-    <img src="https://img.shields.io/github/stars/healkeiser/fxhoudinikimodo" alt="GitHub Stars"/>&nbsp;&nbsp;
+    <img src="https://img.shields.io/github/stars/healkeiser/fxhoudinimotion" alt="GitHub Stars"/>&nbsp;&nbsp;
   </p>
 
 </div>
@@ -53,7 +53,7 @@
 
 [Kimodo](https://github.com/nv-tlabs/kimodo) is NVIDIA Research's kinematic motion diffusion model: give it an English sentence such as `a person walks forward slowly`, optionally a root path or pose keyframes, and it generates a 77-joint SOMA human motion clip. It runs locally on an NVIDIA GPU.
 
-**fxhoudinikimodo** brings it into Houdini as a single SOP, `kimodo_motion`. The node talks to a small FastAPI server that keeps the model resident on the GPU, pulls the result back over HTTP, and rebuilds it as KineFX geometry: a skinned body, its capture pose, the animated skeleton and a T-pose, in the same output order as Houdini's own Test Geometry characters. A Joint Deform wired straight across gives you a moving body; Biped Setup and Biped Retarget move that motion onto your own rig.
+**fxhoudinimotion** brings it into Houdini as a single SOP, `kimodo_motion`. The node talks to a small FastAPI server that keeps the model resident on the GPU, pulls the result back over HTTP, and rebuilds it as KineFX geometry: a skinned body, its capture pose, the animated skeleton and a T-pose, in the same output order as Houdini's own Test Geometry characters. A Joint Deform wired straight across gives you a moving body; Biped Setup and Biped Retarget move that motion onto your own rig.
 
 This is a fork of [chordee/kimodo-houdini-bridge](https://github.com/chordee/kimodo-houdini-bridge) with a reworked node interface, scene-FPS retiming and Windows fixes. See [Credits](#credits).
 
@@ -138,7 +138,7 @@ git clone https://github.com/nv-tlabs/kimodo-viser.git
 docker build -t kimodo:1.0 .
 
 # bridge files into the kimodo dir
-cp /path/to/fxhoudinikimodo/kimodo_server.py /path/to/fxhoudinikimodo/docker-compose.bridge.yaml .
+cp /path/to/fxhoudinimotion/kimodo_server.py /path/to/fxhoudinimotion/docker-compose.bridge.yaml .
 mkdir -p output
 
 # weights (Kimodo is ungated; the Llama-based text encoder needs your HF token)
@@ -165,7 +165,7 @@ python -m pip install --target vendor --no-deps QtPy
 QtPy is a pure-Python wheel, so any Python 3.7+ can install it; `--no-deps` is safe because
 its only runtime dependency, `packaging`, already ships with Houdini.
 
-Copy `fxhoudinikimodo.json` into `$HOUDINI_USER_PREF_DIR/packages/` and set `KIMODO_BRIDGE_ROOT` in it to this repo's absolute path. Restart Houdini. The node appears under **Tab ▸ Kimodo**.
+Copy `fxhoudinimotion.json` into `$HOUDINI_USER_PREF_DIR/packages/` and set `KIMODO_BRIDGE_ROOT` in it to this repo's absolute path. Restart Houdini. The node appears under **Tab ▸ Kimodo**.
 
 <!-- USAGE -->
 ## Usage
@@ -348,7 +348,7 @@ autoMemoryReclaim=gradual
 
 It takes effect after `wsl --shutdown`, which stops Docker, so do it between sessions.
 
-The Houdini package (`fxhoudinikimodo.json`) adds `houdini/` to `HOUDINI_PATH` (otls, python_panels) and `houdini/python` to `PYTHONPATH` (the timeline panel's code).
+The Houdini package (`fxhoudinimotion.json`) adds `houdini/` to `HOUDINI_PATH` (otls, python_panels) and `houdini/python` to `PYTHONPATH` (the timeline panel's code).
 
 <!-- DEVELOPMENT -->
 ## Development
@@ -389,7 +389,7 @@ rebuild.
 <!-- CONTACT -->
 ## Contact
 
-Project Link: [fxhoudinikimodo](https://github.com/healkeiser/fxhoudinikimodo)
+Project Link: [fxhoudinimotion](https://github.com/healkeiser/fxhoudinimotion)
 
 <p align='center'>
   <!-- GitHub profile -->
