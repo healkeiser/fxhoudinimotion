@@ -1,19 +1,8 @@
 <div align="center">
 
-  <img src="https://cdn.simpleicons.org/houdini/FF4713" alt="Houdini" width="80">
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://cdn.simpleicons.org/nvidia/76B900" alt="NVIDIA" width="80">
-
-  <h3 align="center">fxhoudinimotion</h3>
-
   <p align="center">
-    NVIDIA Kimodo text-to-motion inside SideFX Houdini.
-    <br/>
-    One KineFX SOP: type a prompt, get a skinned, animated character.
-    <br/><br/>
+    <img src="https://raw.githubusercontent.com/healkeiser/fxhoudinimotion/main/docs/images/banner.webp" alt="fxhoudinimotion: NVIDIA motion models in SideFX Houdini" width="100%">
   </p>
-
-  ##
 
   <p align="center">
     <!-- Maintenance status -->
@@ -26,7 +15,7 @@
     <a href="https://github.com/healkeiser/fxhoudinimotion/pulse" alt="Activity">
       <img src="https://img.shields.io/github/commit-activity/m/healkeiser/fxhoudinimotion?&logo=github&label=Commit%20Activity"/></a>&nbsp;&nbsp;
     <!-- GitHub stars -->
-    <img src="https://img.shields.io/github/stars/healkeiser/fxhoudinimotion" alt="GitHub Stars"/>&nbsp;&nbsp;
+    <img src="https://img.shields.io/github/stars/healkeiser/fxhoudinimotion" alt="GitHub Stars"/>
   </p>
 
 </div>

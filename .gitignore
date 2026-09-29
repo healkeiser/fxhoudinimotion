@@ -25,3 +25,6 @@ backup/
 
 # Throwaway MotionBricks spike (phase 0): run from a MotionBricks venv, never shipped.
 /scripts/motionbricks_*.py
+
+# banner.py writes this; banner.png / banner.webp are the committed renders
+/docs/images/banner.html
