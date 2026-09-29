@@ -16,6 +16,7 @@ PURE = [
     "kimodo_adapter",
     "fxmotion_server",
     "kimodo_backend",
+    "fxmotion.clip",
 ]
 
 
