@@ -1,11 +1,11 @@
 # Tool configuration only. Nothing here is installable: the Houdini half is
-# put on PYTHONPATH by fxhoudinimotion.json, and kimodo_server.py runs inside
-# the kimodo:1.0 image from docker-compose.bridge.yaml. A [project] table
+# put on PYTHONPATH by fxhoudinimotion.json, and the model servers in server/
+# run inside the kimodo:1.0 image from docker-compose.bridge.yaml. A [project] table
 # would describe a package that no one pip installs.
 
 [tool.ruff]
-# Houdini 20.5 ships Python 3.11; the server runs on whatever the kimodo image
-# has, which has never been pinned. py310 is the floor both are known to clear.
+# Houdini 20.5+ ships Python 3.11; the servers run in the kimodo:1.0 image
+# (NGC pytorch 24.10, Python 3.10). py310 is the floor both clear.
 target-version = "py310"
 line-length = 80
 extend-exclude = ["vendor", "backup", "houdini/otls"]
@@ -30,9 +30,9 @@ ignore = [
     # `"%s" % x` is used consistently across the panel, the scripts and the
     # tests. Converting 62 sites to f-strings would churn working code.
     "UP031",
-    # Optional[X] over X | None: the pydantic models in kimodo_server.py
-    # resolve their annotations at runtime, and the interpreter inside
-    # kimodo:1.0 is not pinned anywhere. Optional works on every version.
+    # Optional[X] over X | None: the pydantic models in server/fxmotion_server.py
+    # resolve their annotations at runtime, inside kimodo:1.0 (Python
+    # 3.10). Optional works on every version.
     "UP045",
 ]
 

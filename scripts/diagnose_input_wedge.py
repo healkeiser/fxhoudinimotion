@@ -1,6 +1,6 @@
 """Capture why Houdini's panes stopped answering the mouse.
 
-Symptom: the Kimodo Timeline panel still responds, keyboard shortcuts still
+Symptom: the Motion Timeline panel (then Kimodo Timeline) still responds, keyboard shortcuts still
 work, and every Houdini pane ignores the mouse until a restart.
 
 Run this in Houdini's Python Shell. Save a baseline while things work, then run

@@ -13,7 +13,7 @@ stored in **unpacked (VCS-friendly) format** — a directory ending in `.hda/`.
 
 A SOP node that generates 3D human motion from a natural language prompt via the
 [NVIDIA Kimodo](https://github.com/nv-tlabs/kimodo) model. It sends the prompt to a
-running `kimodo_server`, downloads the resulting NPZ over HTTP, and rebuilds the
+running Kimodo server, downloads the resulting clip over HTTP, and rebuilds the
 77-joint SOMA motion as KineFX-compatible geometry — animated skeleton, rest
 skeletons, and a skinned body mesh.
 
@@ -78,15 +78,14 @@ in the network editor.
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | Start Frame | `$FSTART` | Scene frame the clip begins on. First sample holds before it, last sample after it. |
-| NPZ Path | _(empty)_ | The `.npz` the node reads. Set by Generate, or point it at any compatible SOMA77 NPZ by hand (no server needed). |
+| Clip Path | _(empty)_ | The `fxmotion.clip/1` `.npz` the node reads. Set by Generate, or point it at any clip in that format by hand (no server needed). |
 | Retime to Scene FPS _(Advanced)_ | `on` | Map the 30 fps clip onto scene frames so it keeps its real duration at 24/25/30 fps (nearest sample). Off = one sample per frame. |
-| Clip FPS _(Advanced)_ | `30` | Rate Kimodo generated at; a property of the model, not the scene. Setting it to `$FPS` silently disables retiming. |
 
 **Server**
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| API Server URL | `http://localhost:8001` | URL of the running `kimodo_server`. Point at the GPU host if it runs elsewhere. |
+| API Server URL | `http://localhost:8001` | URL of the running Kimodo server. Point at the GPU host if it runs elsewhere. |
 | **Test Connection** | — | Pings `/health` and reports in Status. |
 | Download Dir | `$HIP/kimodo_cache` | Local folder where finished NPZ files are downloaded. |
 
@@ -102,9 +101,11 @@ An NPZ file (NumPy compressed archive) is Kimodo's inference output. The node re
 | `root_positions` | `(T, 3)` | Root (Hips) world position |
 | `foot_contacts` | `(T, 6)` | Boolean foot-contact labels — **read by the node** when present; becomes `contact` on output 2 |
 
-The node only needs **`posed_joints`** and **`global_rot_mats`** (SOMA77 joint order) to
-rebuild the skeleton. Any compatible NPZ works regardless of how it was produced — set
-**NPZ Path** to it. **Download Dir** is only used by **Generate**.
+The node reads clips in the `fxmotion.clip/1` format (`houdini/python/fxmotion/clipformat.py`):
+world positions and rotations per joint, the rest pose and the clip's own frame rate. A
+raw Kimodo NPZ is refused with a message naming the missing keys; the server converts
+Kimodo output to the format. Set **Clip Path** to any such file. **Download Dir** is only
+used by **Generate**.
 
 #### Foot contacts
 
@@ -144,7 +145,7 @@ cues.
 
 ### Timeline panel
 
-**Open Timeline** (Generate tab) opens the **Kimodo Timeline** Python Panel bound to the selected
+**Open Timeline** (Generate tab) opens the **Motion Timeline** Python Panel bound to the selected
 node. It edits a hidden `timeline_json` parm: ordered prompt segments (scene frames each), a
 transition length (clip samples blended at each boundary), and pose tracks (Full Body, L/R Hand,
 L/R Foot) holding scene frames at which the posed skeleton on input 1 is sampled. While a
@@ -237,7 +238,7 @@ Re-running with identical settings returns instantly (Status shows `Done (cached
 
 ### Prerequisites
 
-A running `kimodo_server`. From the kimodo dir (see [Setup Guide](../docs/setup.md)):
+A running Kimodo server. From the kimodo dir, with `FXMOTION_ROOT` set (see [Setup Guide](../docs/setup.md)):
 
 ```bash
 docker compose -f docker-compose.bridge.yaml up text-encoder -d   # wait until healthy
@@ -252,17 +253,16 @@ resident in VRAM while the api container runs — stop it to free VRAM.
 
 ## Rebuilding the HDA
 
-If you edit the cook scripts or skinning, regenerate the HDA:
+The asset holds no logic: its callbacks and cooks call into
+`houdini/python/fxmotion/nodes/`, so most changes need no rebuild. If you change the
+parameter interface or the skinning, regenerate it:
 
 ```bash
 # 1. Build the embedded skin geometry (mesh + capture, A-pose skeleton)
 hython scripts/build_skin.py
 
-# 2. Rebuild the packed HDA at the repo root (embeds the skin sections)
-hython scripts/create_hda.py
-
-# 3. Add the help card and save the unpacked HDA to houdini/otls/
-hython scripts/_add_help.py
+# 2. Build vb::kimodo_motion::2.0, help card included, into houdini/otls/
+hython scripts/build_hda.py
 ```
 
 ---
@@ -272,7 +272,7 @@ hython scripts/_add_help.py
 ### Option A — Houdini Package (recommended)
 
 Copy the package file to your Houdini packages directory, then edit
-`KIMODO_BRIDGE_ROOT` to the absolute path of this repo:
+`FXMOTION_ROOT` to the absolute path of this repo:
 
 ```bash
 # Windows
@@ -281,7 +281,9 @@ copy fxhoudinimotion.json %HOUDINI_USER_PREF_DIR%\packages\
 cp fxhoudinimotion.json ~/houdiniXX.Y/packages/
 ```
 
-Restart Houdini — the **Kimodo Motion** SOP appears in the Tab menu under **Kimodo**.
+Restart Houdini — the **Kimodo Motion** SOP appears in the Tab menu under **fxmotion**.
+Scenes saved with the 1.1 node still load and play their downloaded clips, but
+1.1 cannot Generate against the current server; use a new (2.0) node.
 
 ### Option B — Manual install
 

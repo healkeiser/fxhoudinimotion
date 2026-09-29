@@ -21,7 +21,7 @@ more than a green checkmark. Say if you could not test something. -->
 
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 - [ ] ASCII only in code, comments, log strings and commit messages
-- [ ] If the HDA changed: regenerated with `hython scripts/create_hda.py` rather than
+- [ ] If the HDA changed: regenerated with `hython scripts/build_hda.py` rather than
       edited in Type Properties, and both the packed `.hda` and the expanded
       `houdini/otls/` tree are committed
 - [ ] One concern per PR

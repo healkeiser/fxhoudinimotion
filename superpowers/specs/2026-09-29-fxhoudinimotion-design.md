@@ -258,3 +258,24 @@ MotionBricks precedes ARDY because it is proven on Windows.
   not fit together next to Houdini on 24 GB; the idle unload in section 2 and
   a CPU text encoder option address it.
 - Live pacing in Houdini is unmeasured; spike 2 decides the mechanism.
+
+## 10. Addendum: decisions made while planning and building phase 1 (2026-09-29)
+
+The twelve "Spec clarifications decided while planning" of
+`superpowers/plans/2026-09-29-phase1-foundation-kimodo.md` apply to this
+spec: effectors folded into keyframes (`joints`), the `options` dict, the
+`continue` capability, optional `time_s` on root-path points, server-side
+canonicalisation (which fixes 1.1's pose-key / root-path mismatch), the floor
+invariant on generated clips only, ORTHO_TOL = 1e-2, parent-first joint
+order, 1.1 nodes playing but not generating, the repo mounted into the Kimodo
+container, no `source_fps` parm, and pose keys without input 1 raising.
+
+Two more came out of the mid-phase review:
+
+- Section 2, decision 2 says a process loads its model on the first request.
+  The Kimodo server keeps 1.1's behaviour instead: it preloads at startup and
+  `FXMOTION_IDLE_UNLOAD_S` defaults to 0 (never unload), because a Kimodo load
+  takes long enough that a cold first Generate reads as a hang. Set the
+  variable to free VRAM between sessions.
+- Request times outside the clip (a root-path point or keyframe before 0 or
+  past the last sample) are refused with a 422, rather than clamped.

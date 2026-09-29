@@ -1,5 +1,5 @@
 """SOMA77 skeleton data \u2014 the single source of truth shared by every kimodo_motion
-cook script (emitted into the HDA's PythonModule section by create_hda.py).
+node and server, read through fxmotion.skeletons (the 1.1 HDA keeps its own copy).
 
 Swapping to a different skeleton means editing only this file.
 """

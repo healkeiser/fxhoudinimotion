@@ -1,20 +1,20 @@
 {
     "env": [
         {
-            "KIMODO_BRIDGE_ROOT": "/path/to/fxhoudinimotion"
+            "FXMOTION_ROOT": "/path/to/fxhoudinimotion"
         },
         {
             "PYTHONPATH": {
                 "method": "append",
-                "value": "$KIMODO_BRIDGE_ROOT/houdini/python"
+                "value": "$FXMOTION_ROOT/houdini/python"
             }
         },
         {
             "PYTHONPATH": {
                 "method": "append",
-                "value": "$KIMODO_BRIDGE_ROOT/vendor"
+                "value": "$FXMOTION_ROOT/vendor"
             }
         }
     ],
-    "path": "$KIMODO_BRIDGE_ROOT/houdini"
+    "path": "$FXMOTION_ROOT/houdini"
 }

@@ -1,4 +1,4 @@
-# Kimodo Timeline panel
+# Motion Timeline panel
 
 A dockable Python Panel that edits a prompt timeline and constraint tracks on a
 `vb::kimodo_motion` node. The node stays usable without it.
@@ -54,7 +54,7 @@ includes both. Single-prompt requests are unchanged.
 
 ## Panel
 
-`houdini/python_panels/kimodo_timeline.pypanel` + package `houdini/python/kimodo_timeline/`
+`houdini/python_panels/fxmotion_timeline.pypanel` + package `houdini/python/fxmotion/timeline/`
 (on `PYTHONPATH` via the Houdini package file).
 
 - `model.py`: timeline arithmetic, no `hou`, no Qt. Tested by `tests/test_timeline_model.py`.

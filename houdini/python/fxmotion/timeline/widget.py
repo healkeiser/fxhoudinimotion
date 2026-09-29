@@ -1,4 +1,4 @@
-"""Kimodo Timeline: a Qt view over model.Timeline, bound to a Kimodo Motion
+"""Motion Timeline: a Qt view over model.Timeline, bound to a Kimodo Motion
 node.
 
 View controls follow the usual DCC timeline conventions:
@@ -654,7 +654,7 @@ class Canvas(QtWidgets.QWidget):
 
     def _commit(self, verb):
         """One model edit written to the node, as one undo step."""
-        self.edited.emit("Kimodo timeline: " + verb)
+        self.edited.emit("Motion timeline: " + verb)
         self.update()
 
     def mouseDoubleClickEvent(self, ev):
@@ -925,7 +925,7 @@ class TimelineWidget(QtWidgets.QWidget):
         )
         self.transition.valueChanged.connect(self._transition_changed)
         self.transition.editingFinished.connect(
-            lambda: self._write("Kimodo timeline: transition")
+            lambda: self._write("Motion timeline: transition")
         )
         foot.addWidget(self.transition)
         foot.addSpacing(16)
@@ -1176,7 +1176,7 @@ class TimelineWidget(QtWidgets.QWidget):
             f"     <span style='color:#9a9a9a'>{hip}</span>"
         )
 
-    def _write(self, label="Kimodo timeline edit"):
+    def _write(self, label="Motion timeline edit"):
         if self.node is None:
             return
         bridge.save(self.node, self.canvas.tl, label)
@@ -1194,7 +1194,7 @@ class TimelineWidget(QtWidgets.QWidget):
         the rest of the panel does not."""
         if self.node is None:
             return
-        self._write("Kimodo timeline: regenerate")
+        self._write("Motion timeline: regenerate")
         try:
             from . import regen
         except ImportError as e:
@@ -1213,5 +1213,5 @@ class TimelineWidget(QtWidgets.QWidget):
         if not self.canvas.tl.segments:
             self._set_status("Add at least one segment")
             return
-        self._write("Kimodo timeline: generate")
+        self._write("Motion timeline: generate")
         bridge.generate(self.node)

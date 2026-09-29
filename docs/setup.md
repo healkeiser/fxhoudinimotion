@@ -58,12 +58,14 @@ docker build -t kimodo:1.0 .   # first build downloads the ~10 GB base image
 ## 3. Deploy the bridge into the kimodo dir
 
 The server runs from the kimodo repo (it needs the `kimodo` package on `/workspace`).
-Copy the two bridge files in — the compose file has a distinct name so it sits next
-to Kimodo's own `docker-compose.yaml`:
+Copy the compose file in; it has a distinct name so it sits next to Kimodo's own
+`docker-compose.yaml`. The server code itself is not copied: the container mounts
+this repo read-only at `/fxmotion`, from `FXMOTION_ROOT`, and runs
+`server/kimodo_backend.py` from there.
 
 ```bash
-cp /path/to/fxhoudinimotion/kimodo_server.py .
 cp /path/to/fxhoudinimotion/docker-compose.bridge.yaml .
+export FXMOTION_ROOT=/path/to/fxhoudinimotion   # on Windows: put it in .env, see below
 mkdir -p output
 export HUGGING_FACE_HUB_TOKEN=$(cat ~/.cache/huggingface/token)   # or paste your hf_... token
 ```
@@ -74,6 +76,7 @@ with a `.env` next to the compose file:
 
 ```
 HF_HOME=C:/Users/<you>/.cache/huggingface
+FXMOTION_ROOT=C:/Users/<you>/Documents/GitHub/fxhoudinimotion
 ```
 
 In PowerShell, read the token without echoing it:
@@ -190,5 +193,4 @@ Drop a **`kimodo_motion`** node in a SOP network:
 > end-effector constraints — see [houdini/README.md](../houdini/README.md#constraints-optional).
 >
 > Developers who edit the cook scripts can rebuild the HDA:
-> `hython scripts/build_skin.py` → `hython scripts/create_hda.py` →
-> `hython scripts/_add_help.py` — see [houdini/README.md](../houdini/README.md#rebuilding-the-hda).
+> `hython scripts/build_skin.py` → `hython scripts/build_hda.py` — see [houdini/README.md](../houdini/README.md#rebuilding-the-hda).

@@ -23,8 +23,8 @@ Three projects sit in a line, and a bug usually belongs to exactly one of them:
 | Symptom | Where it goes |
 | --- | --- |
 | The motion itself is wrong, drifts, or ignores the prompt | [nv-tlabs/kimodo](https://github.com/nv-tlabs/kimodo), not here |
-| The server does not start, or `/generate` returns the wrong thing | here, `kimodo_server.py` |
-| The node, the panel, the skinning or the transforms | here, `scripts/create_hda.py` or `houdini/python/` |
+| The server does not start, or `/generate` returns the wrong thing | here, `server/` (`fxmotion_server.py`, `kimodo_backend.py`, `kimodo_adapter.py`) |
+| The node, the panel, the skinning or the transforms | here, `houdini/python/fxmotion/` or `scripts/build_hda.py` |
 | The containers do not come up | here, `docker-compose.bridge.yaml` |
 
 If you are not sure, open an issue and say what you observed. Guessing wrong costs
@@ -56,22 +56,21 @@ python -m pip install --target vendor --no-deps QtPy
 
 ## The HDA is generated
 
-This is the rule that costs the most time when missed. `scripts/create_hda.py` is the
-single source of the node interface, cook scripts and callbacks.
-`houdini/otls/vb_kimodo_motion_1.1.hda/` is the expanded, reviewable result, and
-`vb_kimodo_motion_1.1.hda` in the repo root is the packed one.
+This is the rule that costs the most time when missed. `scripts/build_hda.py` is the
+single source of the node interface; every callback and cook inside the asset is a
+one-line call into `houdini/python/fxmotion/nodes/`, where the logic lives and is
+tested. `houdini/otls/vb_kimodo_motion_2.0.hda/` is the expanded, reviewable result.
+`vb_kimodo_motion_1.1.hda/` next to it is frozen: old scenes load it, nothing edits it.
 
 **Anything you change in Type Properties by hand is overwritten on the next rebuild.**
 Fold it into the script instead, then regenerate:
 
 ```shell
 hython scripts/build_skin.py     # embedded skin mesh + A-pose skeleton, needs kimodo cloned alongside
-hython scripts/create_hda.py     # the HDA itself, packed, in the repo root
-hython scripts/_add_help.py      # help card, saved expanded into houdini/otls/
+hython scripts/build_hda.py      # the HDA, help card included, expanded into houdini/otls/
 ```
 
-Commit both the packed `.hda` and the expanded `houdini/otls/` tree. The expanded tree is
-what a reviewer can actually read.
+Commit the expanded `houdini/otls/` tree; it is what a reviewer can actually read.
 
 `.gitattributes` forces LF inside `houdini/otls/` and marks the gzipped section binary. If
 your editor or a script rewrites those line endings, `hotl` cannot repack the HDA. Do not
@@ -101,7 +100,7 @@ because it needs `hou.ui` and a real Qt application:
 exec(open("tests/test_houdini_live.py").read()); print("\n".join(run()))
 ```
 
-Run the live test for any change under `houdini/python/kimodo_timeline/`. It states its own
+Run the live test for any change under `houdini/python/fxmotion/`. It states its own
 limits honestly at the top of the file: it proves the hygiene properties it can measure,
 and it does not prove the pane-wedge bug is gone, because no reliable programmatic
 detector for that was ever found. Clicking a Houdini pane afterwards is still part of the
@@ -166,8 +165,8 @@ under depends on the file you touched. [LICENSE](LICENSE) has the exact list.
 
 - Touching the panel, the tests, the packaging or this file? That is the **MIT** half, and
   your contribution ships under MIT.
-- Touching `kimodo_server.py`, `scripts/create_hda.py`, the generated HDA or the upstream
-  docs? Those are derived from
+- Touching `server/`, the node code ported from the 1.1 asset, the generated HDAs or the
+  upstream docs ([LICENSE](LICENSE) has the full list)? Those are derived from
   [chordee/kimodo-houdini-bridge](https://github.com/chordee/kimodo-houdini-bridge) and
   carry its terms, personal and research use. Your additions there are offered under MIT
   to the extent they are separable, which is what keeps a future relicensing possible if

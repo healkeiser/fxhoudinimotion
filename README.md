@@ -70,7 +70,7 @@ This is a fork of [chordee/kimodo-houdini-bridge](https://github.com/chordee/kim
 | **Foot contacts** | Kimodo's per-frame contact labels arrive as an `int contact` point attribute, ready for foot locking or footstep FX. |
 | **Server that stays warm** | Model preloaded once, results cached by prompt + duration + model + constraints, text encoder on CPU to spare VRAM. Runs on your workstation or a remote GPU box. |
 | **Status where you look** | Job state shown under the node in the network editor, plus a Test Connection button. No modal dialogs on Generate. |
-| **Offline loader** | Point NPZ Path at any SOMA77 clip produced elsewhere and the node rebuilds it without a server. |
+| **Offline loader** | Point Clip Path at any `fxmotion.clip/1` file and the node rebuilds it without a server. |
 
 <!-- ARCHITECTURE -->
 ## Architecture
@@ -86,7 +86,7 @@ flowchart LR
         H1 --> H3
     end
 
-    subgraph Server[" ⚡ kimodo_server · Docker "]
+    subgraph Server[" ⚡ kimodo_backend · Docker "]
         direction TB
         S1("FastAPI · port 8001")
         S2("Kimodo diffusion · GPU")
@@ -137,8 +137,10 @@ git remote add upstream https://github.com/nv-tlabs/kimodo.git
 git clone https://github.com/nv-tlabs/kimodo-viser.git
 docker build -t kimodo:1.0 .
 
-# bridge files into the kimodo dir
-cp /path/to/fxhoudinimotion/kimodo_server.py /path/to/fxhoudinimotion/docker-compose.bridge.yaml .
+# the compose file goes into the kimodo dir; the server code is mounted from
+# this repo, so point FXMOTION_ROOT at it (in .env on Windows, see below)
+cp /path/to/fxhoudinimotion/docker-compose.bridge.yaml .
+export FXMOTION_ROOT=/path/to/fxhoudinimotion
 mkdir -p output
 
 # weights (Kimodo is ungated; the Llama-based text encoder needs your HF token)
@@ -146,10 +148,10 @@ hf download nvidia/Kimodo-SOMA-RP-v1.1
 
 docker compose -f docker-compose.bridge.yaml up text-encoder -d   # wait for "healthy"
 MOCK_MODE=0 docker compose -f docker-compose.bridge.yaml up api -d
-curl http://localhost:8001/health     # {"status":"ok","mock_mode":false}
+curl http://localhost:8001/health     # {"backend":"kimodo", ..., "mock_mode":false}
 ```
 
-On Windows, add a `.env` next to the compose file with `HF_HOME=C:/Users/<you>/.cache/huggingface`; the compose file falls back to `$HOME`, which Windows does not set. Large weight downloads are faster on the host (`uv tool run --from huggingface_hub hf download ...`) than through the Docker bind mount.
+On Windows, add a `.env` next to the compose file with `HF_HOME=C:/Users/<you>/.cache/huggingface` and `FXMOTION_ROOT=C:/Users/<you>/Documents/GitHub/fxhoudinimotion`; the compose file falls back to `$HOME`, which Windows does not set. Large weight downloads are faster on the host (`uv tool run --from huggingface_hub hf download ...`) than through the Docker bind mount.
 
 ### Houdini
 
@@ -165,7 +167,9 @@ python -m pip install --target vendor --no-deps QtPy
 QtPy is a pure-Python wheel, so any Python 3.7+ can install it; `--no-deps` is safe because
 its only runtime dependency, `packaging`, already ships with Houdini.
 
-Copy `fxhoudinimotion.json` into `$HOUDINI_USER_PREF_DIR/packages/` and set `KIMODO_BRIDGE_ROOT` in it to this repo's absolute path. Restart Houdini. The node appears under **Tab ▸ Kimodo**.
+Copy `fxhoudinimotion.json` into `$HOUDINI_USER_PREF_DIR/packages/` and set `FXMOTION_ROOT` in it to this repo's absolute path. Restart Houdini. The node appears under **Tab ▸ fxmotion**.
+
+Scenes saved with the older **Kimodo Motion 1.1** node still load and still play the clips they already downloaded, but 1.1 cannot Generate against the current server. Drop a new node (2.0) to generate.
 
 <!-- USAGE -->
 ## Usage
@@ -302,7 +306,10 @@ Read by `docker-compose.bridge.yaml`:
 | `HUGGING_FACE_HUB_TOKEN` | — | Token for gated downloads (the Llama text encoder). |
 | `KIMODO_MODEL` | Kimodo default | Checkpoint preloaded by the `api` container. |
 | `KIMODO_PORT` | `8001` | API port. 8000 is taken by Docker Desktop on Windows. |
-| `MOCK_MODE` | `0` | `1` serves `output/dev_reference.npz` without inference, for HDA work without a GPU. |
+| `MOCK_MODE` | `0` | `1` serves `output/dev_reference.npz` (a Kimodo NPZ) without inference, for HDA work without a GPU. Mock clips are cached apart from real ones. |
+| `FXMOTION_ROOT` | (required) | The fxhoudinimotion clone, mounted read-only into the `api` container at `/fxmotion`. |
+| `FXMOTION_IDLE_UNLOAD_S` | `0` | Seconds without a job before the server frees the model's VRAM; `0` keeps it loaded. |
+| `FXMOTION_MOCK_CLIP` | `output/dev_reference.npz` | The Kimodo NPZ served in mock mode. |
 | `HF_HUB_OFFLINE` | `1` | Load weights from the local cache only; set `0` for a one-time download. |
 | `TEXT_ENCODERS_DIR` | — | Local folder of LLM2Vec adapters, when you cannot pull Meta's repo directly. |
 | `KIMODO_ENCODE_EST_S` | `30` | Starting guess, in seconds, for how long a segment spends encoding text. It only shapes the progress bar through the phase Kimodo reports nothing for. The server times the first encode it completes and uses that measurement from then on, including for later jobs, so this matters mainly for the very first generation after a restart. The default is the measured CPU figure. |
@@ -353,22 +360,19 @@ The Houdini package (`fxhoudinimotion.json`) adds `houdini/` to `HOUDINI_PATH` (
 <!-- DEVELOPMENT -->
 ## Development
 
-The HDA is generated, not hand-edited. `scripts/create_hda.py` is the single source of the node interface, cook scripts and callbacks; `houdini/otls/vb_kimodo_motion_1.1.hda/` is the expanded, VCS-friendly result.
+The HDA is generated, not hand-edited. `scripts/build_hda.py` builds the node interface; every callback and cook is a one-line call into `houdini/python/fxmotion/nodes/`, where the logic lives and is tested. `houdini/otls/vb_kimodo_motion_2.0.hda/` is the expanded, VCS-friendly result; the 1.1 asset next to it is frozen.
 
 ```shell
 # 1. embedded skin mesh + A-pose skeleton (needs the kimodo repo cloned alongside)
 hython scripts/build_skin.py
 
-# 2. the HDA itself, packed, in the repo root
-hython scripts/create_hda.py
-
-# 3. help card, saved expanded into houdini/otls/
-hython scripts/_add_help.py
+# 2. the HDA, help card included, expanded into houdini/otls/
+hython scripts/build_hda.py
 ```
 
-Timeline panel: `houdini/python/kimodo_timeline/` (`model.py` is pure Python, run `python tests/test_timeline_model.py`; `bridge.py` talks to the node; `widget.py` is the PySide6 view) and `houdini/python_panels/kimodo_timeline.pypanel`.
+Timeline panel: `houdini/python/fxmotion/timeline/` (`model.py` is pure Python, run `python tests/test_timeline_model.py`; `bridge.py` talks to the node; `widget.py` is the PySide6 view) and `houdini/python_panels/fxmotion_timeline.pypanel`. The model servers are in `server/`: `fxmotion_server.py` is the shared contract, `kimodo_backend.py` and `kimodo_adapter.py` the Kimodo half. Clips use the `fxmotion.clip/1` format, `houdini/python/fxmotion/clipformat.py`.
 
-In a running Houdini, reload with `hou.hda.reloadFile(...)` and call `matchCurrentDefinition()` on existing nodes. Anything changed in Type Properties by hand is overwritten on the next rebuild, so fold it into the script instead. The node icon is `scripts/kimodo_icon.svg`.
+In a running Houdini, reload with `hou.hda.reloadFile(...)` and call `matchCurrentDefinition()` on existing nodes. Anything changed in Type Properties by hand is overwritten on the next rebuild, so fold it into the script instead. The node icon is `houdini/config/Icons/kimodo_motion.svg`; icons there are found by bare file name.
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -376,7 +380,7 @@ In a running Houdini, reload with `hou.hda.reloadFile(...)` and call `matchCurre
 Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers which half
 of the stack a change belongs in, how to test without a GPU (`MOCK_MODE=1`), and the one
 rule that costs the most time when missed: the HDA is generated by
-`scripts/create_hda.py`, so anything edited by hand in Type Properties is lost on the next
+`scripts/build_hda.py`, so anything edited by hand in Type Properties is lost on the next
 rebuild.
 
 <!-- CREDITS -->
@@ -423,7 +427,7 @@ Project Link: [fxhoudinimotion](https://github.com/healkeiser/fxhoudinimotion)
 Two sets of terms, because this is a fork. See [LICENSE](LICENSE) for the file-by-file split.
 
 - **The timeline panel, the tests, the packaging and the docs written for this fork** are [MIT](LICENSE).
-- **Files derived from [chordee/kimodo-houdini-bridge](https://github.com/chordee/kimodo-houdini-bridge)**, which include `kimodo_server.py`, `scripts/create_hda.py`, the generated HDA and two of the docs, carry that project's terms: personal and research use. Upstream ships no license file, so those are the only terms granted, and only its author can widen them.
+- **Files derived from [chordee/kimodo-houdini-bridge](https://github.com/chordee/kimodo-houdini-bridge)**, which include the model servers in `server/`, the node code ported from the 1.1 asset, the generated HDAs and two of the docs (see [LICENSE](LICENSE) for the full list), carry that project's terms: personal and research use. Upstream ships no license file, so those are the only terms granted, and only its author can widen them.
 
 Taken as a whole this repository is **not** open source under the OSI definition. A grant limited to personal and research use does not meet it.
 
