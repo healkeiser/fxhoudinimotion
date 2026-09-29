@@ -6,8 +6,8 @@ import hou
 
 from .model import Timeline
 
-# Node types the panel edits. 1.1 is left out: it can no longer Generate.
-TIMELINE_TYPES = ("vb::kimodo_motion::2.0",)
+# Node types the panel edits. Kimodo 1.1 is left out: it can no longer Generate.
+TIMELINE_TYPES = ("vb::kimodo_motion::2.0", "vb::ardy_motion::1.0")
 
 
 def _is_timeline_node(n) -> bool:

@@ -1,4 +1,4 @@
-"""The Kimodo Motion node: generator.py on the SOMA77 skeleton."""
+"""The ARDY Motion node: generator.py on ARDY's Core skeleton (ardy_core)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .timeline_parms import (  # noqa: F401  (HDA callbacks)
     split_segment,
 )
 
-SKELETON = "soma77"
+SKELETON = "ardy_core"
 
 
 def generate(node) -> None:

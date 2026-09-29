@@ -1,4 +1,4 @@
-"""The HDA callbacks call names in fxmotion.nodes.kimodo and .common; a
+"""The HDA callbacks call names in fxmotion.nodes.kimodo, .ardy and .common; a
 rename that forgets the asset breaks every button silently. Checked from
 source, without hou."""
 
@@ -15,6 +15,18 @@ NODES = (
 
 CALLBACKS = {
     "kimodo.py": {
+        "generate",
+        "cancel",
+        "test_connection",
+        "make_pose_rig",
+        "open_timeline",
+        "sync_segments",
+        "split_segment",
+        "regenerate",
+        "refresh_starts",
+        "on_created",
+    },
+    "ardy.py": {
         "generate",
         "cancel",
         "test_connection",
@@ -52,3 +64,16 @@ def test_every_hda_callback_exists():
     for module, wanted in CALLBACKS.items():
         missing = wanted - _names(NODES / module)
         assert not missing, "%s lacks %s" % (module, sorted(missing))
+
+
+def test_generator_takes_the_skeleton():
+    src = (NODES / "generator.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    args = {
+        f.name: [a.arg for a in f.args.args]
+        for f in tree.body
+        if isinstance(f, ast.FunctionDef)
+    }
+    assert args["generate"] == ["node", "skeleton"]
+    assert args["build_payload"] == ["node", "clip_fps", "skeleton"]
+    assert args["make_pose_rig"] == ["node", "skeleton"]
