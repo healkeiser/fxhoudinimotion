@@ -167,9 +167,7 @@ def keyframe_constraints(keyframes, canon: Canon) -> list:
         joints = tuple(kf.get("joints") or ())
         unknown = [j for j in joints if j not in skel.joint_names]
         if unknown:
-            raise AdapterError(
-                "kimodo: unknown joints %s" % ", ".join(unknown)
-            )
+            raise AdapterError("kimodo: unknown joints %s" % ", ".join(unknown))
         # KineFX transform R = (grot @ tp).T, so grot = R.T @ tp.T
         grot = np.swapaxes(rot, -1, -2) @ tp_t
         groups.setdefault(joints, []).append(
@@ -211,13 +209,11 @@ def _path_items(points, duration_s):
     elif len(xz) > 1:
         # spread evenly over the clip, as 1.1 did
         last = max(2, int(duration_s * FPS)) - 1
-        frames = [
-            int(round(i * last / (len(xz) - 1))) for i in range(len(xz))
-        ]
+        frames = [int(round(i * last / (len(xz) - 1))) for i in range(len(xz))]
     else:
         frames = [0]
     by_frame: dict = {}
-    for f, c in zip(frames, xz):
+    for f, c in zip(frames, xz, strict=True):
         by_frame.setdefault(f, c)
     return sorted(by_frame.items())
 
