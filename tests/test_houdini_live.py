@@ -386,6 +386,77 @@ def test_a_native_npz_is_a_clean_node_error():
         geo.destroy()
 
 
+def _ardy_clip():
+    import sys
+    import tempfile
+    from pathlib import Path
+
+    import numpy as np
+
+    from fxmotion import clipformat
+
+    sys.path.insert(0, str(_repo() / "server"))
+    import diffusion_adapter as da
+
+    with np.load(_repo() / "tests" / "fixtures" / "ardy_path.npz") as z:
+        npz = {k: z[k] for k in z.files}
+    path = Path(tempfile.mkdtemp()) / "ardy.npz"
+    clip = da.to_clip(npz, da.Canon(), da.ModelSpec("ardy", "ardy_core", 20.0))
+    clipformat.save(path, clip)
+    return clip, path
+
+
+def test_ardy_1_outputs_and_details():
+    import numpy as np
+
+    from fxmotion import clip as fxclip
+
+    clip, path = _ardy_clip()
+    geo = hou.node("/obj").createNode("geo", "fxmotion_ardy")
+    try:
+        node = geo.createNode("vb::ardy_motion::1.0")
+        node.parm("clip_path").set(path.as_posix())
+        node.parm("retime").set(0)
+        counts = [len(node.geometry(i).points()) for i in range(4)]
+        assert counts == [9084, 27, 27, 27], counts
+        hou.setFrame(31)  # start frame 1, no retime: sample 30
+        g = node.geometry(2)
+        assert g.attribValue("fxmotion_skeleton") == "ardy_core"
+        assert g.attribValue("fxmotion_fps") == 20.0
+        pos, _, _ = fxclip.joint_frames(clip, 30)
+        got = np.array(g.pointFloatAttribValues("P")).reshape(-1, 3)
+        assert np.abs(got - pos).max() < 1e-5
+        assert node.parm("server_url").eval() == "http://localhost:8002"
+        assert node.parm("seg_regen1") is None  # no Regenerate on ARDY
+        assert node.errors() == ()
+    finally:
+        geo.destroy()
+
+
+def test_ardy_pose_input_must_be_ardy_core():
+    import json
+
+    from fxmotion.nodes import ardy
+
+    geo = hou.node("/obj").createNode("geo", "fxmotion_ardy_pose")
+    try:
+        node = geo.createNode("vb::ardy_motion::1.0")
+        rig = geo.createNode("vb::kimodo_motion::2.0")  # a SOMA77 skeleton
+        node.setInput(1, rig, 1)
+        # a new node owns a timeline, so the key goes on its full-body track
+        tl = json.loads(node.parm("timeline_json").eval())
+        tl["tracks"] = {"fullbody": [1]}
+        node.parm("timeline_json").set(json.dumps(tl))
+        try:
+            ardy.build_payload(node, 20.0)
+        except ValueError as e:
+            assert "ARDY_CORE" in str(e), str(e)
+        else:
+            raise AssertionError("a SOMA77 pose rig was accepted")
+    finally:
+        geo.destroy()
+
+
 def run():
     results = []
     for name, fn in sorted(globals().items()):

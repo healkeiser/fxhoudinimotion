@@ -1,0 +1,44 @@
+= ARDY Motion =
+
+#type: node
+#context: sop
+#tags: ardy, fxmotion, motion, ai, kinefx, animation
+
+Generates human motion from text prompts with NVIDIA ARDY, as ARDY's 27-joint
+Core skeleton and a skinned body, ready for KineFX.
+
+== Overview ==
+
+The node talks to a running ARDY server (`scripts/run_ardy_server.ps1`, see the
+fxhoudinimotion setup guide). __Generate__ sends the segments, the root path
+on input 0 and the pose keys from input 1. ARDY generates the timeline two
+seconds at a time, each step seeing the last four seconds of motion, so a
+prompt change takes a moment to show. ARDY works at 20 fps; __Retime to Scene
+FPS__ keeps the clip's real duration.
+
+Wire a __Joint Deform__ straight across (0 -> 0, 1 -> 1, 2 -> 2) for a moving
+body.
+
+@inputs
+
+Root Path:
+    A curve or points: the root passes through their XZ positions. Points
+    with an int `frame` attribute are timed waypoints.
+
+Pose:
+    A posed Core skeleton (see __Create Pose Rig__), sampled at the pose keys.
+
+@outputs
+
+Rest Geometry:
+    The Core body, bound to the Capture Pose.
+
+Capture Pose:
+    The skeleton the body is bound to.
+
+Animated Pose:
+    The generated motion. Detail attributes `fxmotion_skeleton`,
+    `fxmotion_fps` and `fxmotion_source` describe it.
+
+T-Pose:
+    The Core rest pose.

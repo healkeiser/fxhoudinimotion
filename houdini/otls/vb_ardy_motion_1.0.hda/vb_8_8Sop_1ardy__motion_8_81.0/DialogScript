@@ -1,0 +1,402 @@
+# Dialog script for vb::ardy_motion::1.0 automatically generated
+
+{
+    name	vb::ardy_motion::1.0
+    script	vb::ardy_motion::1.0
+    label	"ARDY Motion"
+
+    help {
+    }
+
+    inputlabel	1	"Root Path / Waypoints (opt)"
+    inputlabel	2	"Pose / skeleton (opt)"
+    inputlabel	3	"Sub-Network Input #3"
+    inputlabel	4	"Sub-Network Input #4"
+    outputlabel	1	"Rest Geometry"
+    outputlabel	2	"Capture Pose"
+    outputlabel	3	"Animated Pose"
+    outputlabel	4	"T-Pose"
+
+    group {
+        name    "fld_generate"
+        label   "Generate"
+
+        parm {
+            name    "open_timeline"
+            label   "Open Timeline"
+            type    button
+            nolabel
+            joinnext
+            default { "0" }
+            help    "Open the __Motion Timeline__ panel for this node: prompt segments, transitions and pose tracks."
+            parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.open_timeline(kwargs['node'])" }
+            parmtag { "script_callback_language" "python" }
+        }
+        parm {
+            name    "generate"
+            label   "Generate"
+            type    button
+            nolabel
+            joinnext
+            default { "0" }
+            help    "Send the request to the server. Progress shows in __Status__ and under the node."
+            parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.generate(kwargs['node'])" }
+            parmtag { "script_callback_language" "python" }
+        }
+        parm {
+            name    "cancel"
+            label   "Cancel"
+            type    button
+            nolabel
+            default { "0" }
+            help    "Cancel the queued job or discard the running one."
+            parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.cancel(kwargs['node'])" }
+            parmtag { "script_callback_language" "python" }
+        }
+        parm {
+            name    "model"
+            label   "Model"
+            type    ordinal
+            default { "0" }
+            help    "__Horizon40__ generates 2 s per step (smoother); __Horizon8__ 0.4 s per step (more reactive to constraints)."
+            menu {
+                "ARDY-Core-RP-20FPS-Horizon40"  "ARDY-Core-RP-20FPS-Horizon40"
+                "ARDY-Core-RP-20FPS-Horizon8"   "ARDY-Core-RP-20FPS-Horizon8"
+            }
+        }
+        parm {
+            name    "force"
+            label   "Force Regenerate"
+            type    toggle
+            default { "1" }
+            help    "Run inference again even if the server has an identical request cached."
+        }
+        parm {
+            name    "seed"
+            label   "Seed"
+            type    integer
+            default { "-1" }
+            help    "`-1` = a new random result each time; any other value repeats a result."
+            range   { -1! 100000 }
+        }
+        multiscroll {
+            name    "segments"
+            label    "Segments"
+            default 1
+            range   { 1! 100 }
+
+            parm {
+                name    "seg_prompt#"
+                label   "Prompt"
+                type    string
+                default { "" }
+                help    "What the character does, in plain __English__. Be specific about body part, direction, speed and style.\n\n__Name the body mechanics, not the intent.__\n\n__Do not prompt for finger or hand detail.__ ARDY's Core skeleton has no fingers."
+                parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.sync_segments(kwargs['node'])" }
+                parmtag { "script_callback_language" "python" }
+            }
+            parm {
+                name    "seg_from#"
+                label   "Frames"
+                type    integer
+                invisible
+                default { "0" }
+                range   { 0 10 }
+            }
+            parm {
+                name    "seg_to#"
+                label   "to"
+                type    integer
+                invisible
+                default { "0" }
+                range   { 0 10 }
+            }
+            parm {
+                name    "seg_range#"
+                label   "Frames"
+                type    label
+                joinnext
+                size    16
+                default { "`chs(\"seg_from#\")` - `chs(\"seg_to#\")`   (`rint(ch(\"seg_frames#\") / ch(\"scene_fps\") * 100) / 100` s)" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" }
+            }
+            parm {
+                name    "seg_frames#"
+                label   "Length"
+                type    integer
+                joinnext
+                default { "48" }
+                help    "Length of this segment in scene frames."
+                range   { 1! 240 }
+                parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.sync_segments(kwargs['node'])" }
+                parmtag { "script_callback_language" "python" }
+            }
+            parm {
+                name    "seg_split#"
+                label   "Split"
+                type    button
+                default { "0" }
+                help    "Cut this segment in two at the playhead."
+                parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.split_segment(kwargs['node'], int(kwargs['script_multiparm_index']) - 1)" }
+                parmtag { "script_callback_language" "python" }
+            }
+        }
+
+        parm {
+            name    "prompt"
+            label   "Prompt"
+            type    string
+            invisible
+            default { "a person walks forward" }
+        }
+        parm {
+            name    "duration_frames"
+            label   "Duration (frames)"
+            type    integer
+            invisible
+            default { "72" }
+            range   { 0 10 }
+        }
+        parm {
+            name    "status"
+            label   "Status"
+            type    string
+            invisible
+            default { "" }
+        }
+        parm {
+            name    "clip_info"
+            label   "Clip"
+            type    string
+            invisible
+            default { "" }
+        }
+        parm {
+            name    "scene_fps"
+            label   "Scene FPS"
+            type    float
+            invisible
+            default { [ "$FPS" hscript-expr ] }
+            range   { 0 10 }
+        }
+    }
+
+    group {
+        name    "fld_constraints"
+        label   "Constraints"
+
+        groupcollapsible {
+            name    "grp_path"
+            label   "Root Path (input 0)"
+            parmtag { "group_default" "1" }
+
+            parm {
+                name    "path_waypoints"
+                label   "Path Waypoints"
+                type    integer
+                default { "8" }
+                help    "The curve is thinned to this many points by arc length. `0` = every point."
+                range   { 0! 64 }
+            }
+        }
+
+        groupcollapsible {
+            name    "grp_json"
+            label   "Constraints JSON"
+            parmtag { "group_default" "0" }
+
+            parm {
+                name    "constraints_file"
+                label   "Constraints File"
+                type    file
+                default { "" }
+                help    "ARDY constraints JSON, in ARDY's own model space. Ignored when Constraints JSON is set."
+                parmtag { "filechooser_pattern" "*.json" }
+            }
+            parm {
+                name    "constraints_json"
+                label   "Constraints JSON"
+                type    string
+                default { "" }
+                help    "Inline ARDY constraints JSON (a list of constraint dicts), in ARDY's model space."
+                parmtag { "editor" "1" }
+                parmtag { "editorlines" "3-8" }
+            }
+        }
+
+        groupcollapsible {
+            name    "grp_pose"
+            label   "Pose Keyframes (input 1)"
+            parmtag { "group_default" "1" }
+
+            parm {
+                name    "make_pose_rig"
+                label   "Create Pose Rig"
+                type    button
+                default { "0" }
+                help    "Drop a capture-pose rig wired to input 1, ready to pose."
+                parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.make_pose_rig(kwargs['node'])" }
+                parmtag { "script_callback_language" "python" }
+            }
+            parm {
+                name    "pose_keyframes"
+                label   "Pose Keyframes"
+                type    string
+                default { "" }
+                help    "Scene frames to sample input 1 at, e.g. `1 45 89`. Disabled while the timeline owns the keys."
+                disablewhen "{ has_timeline == 1 }"
+            }
+            parm {
+                name    "pose_type"
+                label   "Pose Constraint"
+                type    ordinal
+                default { "0" }
+                disablewhen "{ pose_keyframes == \"\" } { has_timeline == 1 }"
+                menu {
+                    "Full-Body"     "Full-Body"
+                    "End-Effector"  "End-Effector"
+                }
+            }
+            parm {
+                name    "ee_left_hand"
+                label   "Left Hand"
+                type    toggle
+                joinnext
+                default { "0" }
+                disablewhen "{ pose_type != End-Effector } { pose_keyframes == \"\" } { has_timeline == 1 }"
+            }
+            parm {
+                name    "ee_right_hand"
+                label   "Right Hand"
+                type    toggle
+                default { "1" }
+                disablewhen "{ pose_type != End-Effector } { pose_keyframes == \"\" } { has_timeline == 1 }"
+            }
+            parm {
+                name    "ee_left_foot"
+                label   "Left Foot"
+                type    toggle
+                joinnext
+                default { "0" }
+                disablewhen "{ pose_type != End-Effector } { pose_keyframes == \"\" } { has_timeline == 1 }"
+            }
+            parm {
+                name    "ee_right_foot"
+                label   "Right Foot"
+                type    toggle
+                default { "0" }
+                disablewhen "{ pose_type != End-Effector } { pose_keyframes == \"\" } { has_timeline == 1 }"
+            }
+        }
+
+    }
+
+    group {
+        name    "fld_output"
+        label   "Output"
+
+        parm {
+            name    "start_frame"
+            label   "Start Frame"
+            type    integer
+            default { [ "$FSTART" hscript-expr ] }
+            help    "Scene frame on which the clip begins."
+            range   { -1000 1000 }
+            parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.refresh_starts(kwargs['node'])" }
+            parmtag { "script_callback_language" "python" }
+        }
+        parm {
+            name    "clip_path"
+            label   "Clip Path"
+            type    file
+            default { "" }
+            help    "The fxmotion clip the node reads. Set by Generate; any fxmotion.clip/1 file works without a server."
+            parmtag { "filechooser_pattern" "*.npz" }
+        }
+        groupcollapsible {
+            name    "grp_advanced"
+            label   "Advanced"
+            parmtag { "group_default" "0" }
+
+            parm {
+                name    "retime"
+                label   "Retime to Scene FPS"
+                type    toggle
+                default { "1" }
+                help    "Keep the clip's real duration at any `$FPS` (nearest sample). Off = one clip sample per scene frame."
+            }
+        }
+
+    }
+
+    group {
+        name    "fld_server"
+        label   "Server"
+
+        parm {
+            name    "server_url"
+            label   "API Server URL"
+            type    string
+            joinnext
+            default { "http://localhost:8002" }
+        }
+        parm {
+            name    "test_connection"
+            label   "Test Connection"
+            type    button
+            default { "0" }
+            parmtag { "script_callback" "from fxmotion.nodes import ardy; ardy.test_connection(kwargs['node'])" }
+            parmtag { "script_callback_language" "python" }
+        }
+        parm {
+            name    "download_dir"
+            label   "Download Dir"
+            type    directory
+            default { "$HIP/fxmotion_cache" }
+        }
+    }
+
+    parm {
+        name    "job_id"
+        label   "Job ID"
+        type    string
+        invisible
+        default { "" }
+    }
+    parm {
+        name    "last_error"
+        label   "Last Error"
+        type    string
+        invisible
+        default { "" }
+    }
+    parm {
+        name    "progress"
+        label   "Progress"
+        type    float
+        invisible
+        default { "0" }
+        range   { 0 1 }
+    }
+    parm {
+        name    "timeline_json"
+        label   "Timeline"
+        type    string
+        invisible
+        default { "" }
+        parmtag { "editor" "1" }
+    }
+    parm {
+        name    "has_timeline"
+        label   "Has Timeline"
+        type    toggle
+        invisible
+        default { "0" }
+    }
+    parm {
+        name    "frame_ref"
+        label   "Frame"
+        type    integer
+        invisible
+        default { [ "$F" hscript-expr ] }
+        range   { 0 10 }
+    }
+}

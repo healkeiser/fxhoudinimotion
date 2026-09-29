@@ -1,0 +1,2 @@
+from fxmotion.nodes import ardy
+ardy.on_created(kwargs['node'])

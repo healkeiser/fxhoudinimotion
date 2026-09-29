@@ -1,6 +1,6 @@
-"""Build vb::kimodo_motion::2.0 with hython, expanded into houdini/otls/.
+"""Build the generator assets with hython, expanded into houdini/otls/.
 
-    hython scripts/build_hda.py
+    hython scripts/build_hda.py [kimodo|ardy|all]
 
 Every callback and cook is one line into fxmotion.nodes: the logic lives in
 the library (version-controlled, tested), the asset only wires parms to it.
@@ -9,6 +9,7 @@ The 1.1 asset in houdini/otls/ is not touched.
 
 import re
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -16,15 +17,11 @@ import hou
 
 REPO = Path(__file__).resolve().parents[1]
 OTLS = REPO / "houdini" / "otls"
-NAME, VERSION, LABEL = "vb::kimodo_motion::2.0", "2.0", "Kimodo Motion"
-LIBRARY = OTLS / "vb_kimodo_motion_2.0.hda"
-SKELETON = "soma77"
-MODELS = ("Kimodo-SOMA-RP-v1.1", "Kimodo-SOMA-SEED-v1.1", "Kimodo-SOMA-RP-v1")
 PY = hou.scriptLanguage.Python
 INDEX = "int(kwargs['script_multiparm_index']) - 1"
 TIMELINE_OWNS = "{ has_timeline == 1 }"
 
-PROMPT_HELP = (
+KIMODO_PROMPT_HELP = (
     "What the character does, in plain __English__. Be specific about body "
     "part, direction, speed and style.\n\n"
     "__Name the body mechanics, not the intent.__ Measured: _a person jumps "
@@ -35,7 +32,7 @@ PROMPT_HELP = (
     "skeleton; the fingers you get back are reconstructed, never generated."
 )
 
-HELP = """= Kimodo Motion =
+KIMODO_HELP = """= Kimodo Motion =
 
 #type: node
 #context: sop
@@ -81,19 +78,120 @@ T-Pose:
 """
 
 
-def cb(fn, *args):
+ARDY_PROMPT_HELP = (
+    "What the character does, in plain __English__. Be specific about body "
+    "part, direction, speed and style.\n\n"
+    "__Name the body mechanics, not the intent.__\n\n"
+    "__Do not prompt for finger or hand detail.__ ARDY's Core skeleton has "
+    "no fingers."
+)
+
+ARDY_HELP = """= ARDY Motion =
+
+#type: node
+#context: sop
+#tags: ardy, fxmotion, motion, ai, kinefx, animation
+
+Generates human motion from text prompts with NVIDIA ARDY, as ARDY's 27-joint
+Core skeleton and a skinned body, ready for KineFX.
+
+== Overview ==
+
+The node talks to a running ARDY server (`scripts/run_ardy_server.ps1`, see the
+fxhoudinimotion setup guide). __Generate__ sends the segments, the root path
+on input 0 and the pose keys from input 1. ARDY generates the timeline two
+seconds at a time, each step seeing the last four seconds of motion, so a
+prompt change takes a moment to show. ARDY works at 20 fps; __Retime to Scene
+FPS__ keeps the clip's real duration.
+
+Wire a __Joint Deform__ straight across (0 -> 0, 1 -> 1, 2 -> 2) for a moving
+body.
+
+@inputs
+
+Root Path:
+    A curve or points: the root passes through their XZ positions. Points
+    with an int `frame` attribute are timed waypoints.
+
+Pose:
+    A posed Core skeleton (see __Create Pose Rig__), sampled at the pose keys.
+
+@outputs
+
+Rest Geometry:
+    The Core body, bound to the Capture Pose.
+
+Capture Pose:
+    The skeleton the body is bound to.
+
+Animated Pose:
+    The generated motion. Detail attributes `fxmotion_skeleton`,
+    `fxmotion_fps` and `fxmotion_source` describe it.
+
+T-Pose:
+    The Core rest pose.
+"""
+
+SPECS = {
+    "kimodo": {
+        "name": "vb::kimodo_motion::2.0",
+        "version": "2.0",
+        "label": "Kimodo Motion",
+        "model_name": "Kimodo",
+        "library": "vb_kimodo_motion_2.0.hda",
+        "module": "kimodo",
+        "skeleton": "soma77",
+        "models": (
+            "Kimodo-SOMA-RP-v1.1",
+            "Kimodo-SOMA-SEED-v1.1",
+            "Kimodo-SOMA-RP-v1",
+        ),
+        "model_help": "__RP__ = Bones Rigplay 1 (~700 h of mocap), the "
+        "recommended default. __SEED__ = BONES-SEED (288 h, public data).",
+        "prompt_help": KIMODO_PROMPT_HELP,
+        "help": KIMODO_HELP,
+        "server": "http://localhost:8001",
+        "icon": "kimodo_motion.svg",
+        "regen": True,
+    },
+    "ardy": {
+        "name": "vb::ardy_motion::1.0",
+        "version": "1.0",
+        "label": "ARDY Motion",
+        "model_name": "ARDY",
+        "library": "vb_ardy_motion_1.0.hda",
+        "module": "ardy",
+        "skeleton": "ardy_core",
+        "models": (
+            "ARDY-Core-RP-20FPS-Horizon40",
+            "ARDY-Core-RP-20FPS-Horizon8",
+        ),
+        "model_help": "__Horizon40__ generates 2 s per step (smoother); "
+        "__Horizon8__ 0.4 s per step (more reactive to constraints).",
+        "prompt_help": ARDY_PROMPT_HELP,
+        "help": ARDY_HELP,
+        "server": "http://localhost:8002",
+        "icon": "NVIDIA_badge.svg",
+        "regen": False,
+    },
+}
+
+
+def cb(module, fn, *args):
     extra = "".join(", %s" % a for a in args)
-    return "from fxmotion.nodes import kimodo; kimodo.%s(kwargs['node']%s)" % (
+    return "from fxmotion.nodes import %s; %s.%s(kwargs['node']%s)" % (
+        module,
+        module,
         fn,
         extra,
     )
 
 
-def button(name, label, fn, *args, **kw):
+def button(spec, name, label, fn, *args, **kw):
     return hou.ButtonParmTemplate(
         name,
         label,
-        script_callback=cb(fn, *args),
+        script_callback=cb(spec["module"], fn, *args),
         script_callback_language=PY,
         **kw,
     )
@@ -105,7 +203,7 @@ def hidden_string(name, label, **kw):
     )
 
 
-def parms():
+def parms(spec):
     ptg = hou.ParmTemplateGroup()
 
     gen = hou.FolderParmTemplate(
@@ -113,6 +211,7 @@ def parms():
     )
     gen.addParmTemplate(
         button(
+            spec,
             "open_timeline",
             "Open Timeline",
             "open_timeline",
@@ -124,6 +223,7 @@ def parms():
     )
     gen.addParmTemplate(
         button(
+            spec,
             "generate",
             "Generate",
             "generate",
@@ -135,6 +235,7 @@ def parms():
     )
     gen.addParmTemplate(
         button(
+            spec,
             "cancel",
             "Cancel",
             "cancel",
@@ -146,10 +247,9 @@ def parms():
         hou.MenuParmTemplate(
             "model",
             "Model",
-            MODELS,
+            spec["models"],
             default_value=0,
-            help="__RP__ = Bones Rigplay 1 (~700 h of mocap), the recommended "
-            "default. __SEED__ = BONES-SEED (288 h, public data).",
+            help=spec["model_help"],
         )
     )
     gen.addParmTemplate(
@@ -180,7 +280,7 @@ def parms():
         folder_type=hou.folderType.ScrollingMultiparmBlock,
     )
     seg.setDefaultValue(1)
-    sync = cb("sync_segments")
+    sync = cb(spec["module"], "sync_segments")
     seg.addParmTemplate(
         hou.StringParmTemplate(
             "seg_prompt#",
@@ -189,7 +289,7 @@ def parms():
             default_value=("",),
             script_callback=sync,
             script_callback_language=PY,
-            help=PROMPT_HELP,
+            help=spec["prompt_help"],
         )
     )
     seg.addParmTemplate(
@@ -231,36 +331,40 @@ def parms():
     )
     seg.addParmTemplate(
         button(
+            spec,
             "seg_split#",
             "Split",
             "split_segment",
             INDEX,
-            join_with_next=True,
+            join_with_next=spec["regen"],
             help="Cut this segment in two at the playhead.",
         )
     )
-    seg.addParmTemplate(
-        button(
-            "seg_regen#",
-            "Regenerate",
-            "regenerate",
-            INDEX,
-            "False",
-            join_with_next=True,
-            help="Re-roll this segment alone; the clip keeps its length and "
-            "both joins stay continuous.",
+    if spec["regen"]:
+        seg.addParmTemplate(
+            button(
+                spec,
+                "seg_regen#",
+                "Regenerate",
+                "regenerate",
+                INDEX,
+                "False",
+                join_with_next=True,
+                help="Re-roll this segment alone; the clip keeps its length "
+                "and both joins stay continuous.",
+            )
         )
-    )
-    seg.addParmTemplate(
-        button(
-            "seg_regen_end#",
-            "From Here",
-            "regenerate",
-            INDEX,
-            "True",
-            help="Re-roll this segment and every segment after it.",
+        seg.addParmTemplate(
+            button(
+                spec,
+                "seg_regen_end#",
+                "From Here",
+                "regenerate",
+                INDEX,
+                "True",
+                help="Re-roll this segment and every segment after it.",
+            )
         )
-    )
     gen.addParmTemplate(seg)
     gen.addParmTemplate(
         hou.StringParmTemplate(
@@ -332,8 +436,9 @@ def parms():
             string_type=hou.stringParmType.FileReference,
             file_type=hou.fileType.Any,
             tags={"filechooser_pattern": "*.json"},
-            help="Kimodo constraints JSON, in Kimodo's own model space. "
-            "Ignored when Constraints JSON is set.",
+            help="%s constraints JSON, in %s's own model space. "
+            "Ignored when Constraints JSON is set."
+            % (spec["model_name"], spec["model_name"]),
         )
     )
     js.addParmTemplate(
@@ -343,8 +448,9 @@ def parms():
             1,
             default_value=("",),
             tags={"editor": "1", "editorlines": "3-8"},
-            help="Inline Kimodo constraints JSON (a list of constraint "
-            "dicts), in Kimodo's model space.",
+            help="Inline %s constraints JSON (a list of constraint "
+            "dicts), in %s's model space."
+            % (spec["model_name"], spec["model_name"]),
         )
     )
     con.addParmTemplate(js)
@@ -356,6 +462,7 @@ def parms():
     )
     pose.addParmTemplate(
         button(
+            spec,
             "make_pose_rig",
             "Create Pose Rig",
             "make_pose_rig",
@@ -412,7 +519,7 @@ def parms():
             "start_frame",
             "Start Frame",
             1,
-            script_callback=cb("refresh_starts"),
+            script_callback=cb(spec["module"], "refresh_starts"),
             script_callback_language=PY,
             default_expression=("$FSTART",),
             default_expression_language=(hou.scriptLanguage.Hscript,),
@@ -460,12 +567,12 @@ def parms():
             "server_url",
             "API Server URL",
             1,
-            default_value=("http://localhost:8001",),
+            default_value=(spec["server"],),
             join_with_next=True,
         )
     )
     srv.addParmTemplate(
-        button("test_connection", "Test Connection", "test_connection")
+        button(spec, "test_connection", "Test Connection", "test_connection")
     )
     srv.addParmTemplate(
         hou.StringParmTemplate(
@@ -547,21 +654,22 @@ def _patch_dialog_script(definition, labels):
     )
 
 
-def build():
-    geo = hou.node("/obj").createNode("geo", "kimodo_motion_build")
+def build(spec):
+    geo = hou.node("/obj").createNode("geo", "%s_build" % spec["module"])
     try:
-        subnet = geo.createNode("subnet", "kimodo_motion")
+        subnet = geo.createNode("subnet", "%s_motion" % spec["module"])
         cooks = (
             (
                 "rest_geometry",
-                "common.cook_file(hou.pwd(), %r, 'skin')" % SKELETON,
+                "common.cook_file(hou.pwd(), %r, 'skin')" % spec["skeleton"],
             ),
             (
                 "capture_pose",
-                "common.cook_file(hou.pwd(), %r, 'capture_pose')" % SKELETON,
+                "common.cook_file(hou.pwd(), %r, 'capture_pose')"
+                % spec["skeleton"],
             ),
             ("animated_pose", "common.cook_animated(hou.pwd())"),
-            ("t_pose", "common.cook_rest(hou.pwd(), %r)" % SKELETON),
+            ("t_pose", "common.cook_rest(hou.pwd(), %r)" % spec["skeleton"]),
         )
         # output connector colours, as kinefx::characterio::2.0
         colors = {0: (0.584, 0.776, 1.0), 2: (0.976, 0.780, 0.263)}
@@ -580,27 +688,27 @@ def build():
                 out.setRenderFlag(True)
         subnet.layoutChildren()
 
-        packed = Path(tempfile.mkdtemp()) / "vb_kimodo_motion_2.0.hda"
+        packed = Path(tempfile.mkdtemp()) / spec["library"]
         node = subnet.createDigitalAsset(
-            name=NAME,
+            name=spec["name"],
             hda_file_name=str(packed),
-            description=LABEL,
+            description=spec["label"],
             min_num_inputs=0,
             max_num_inputs=2,
-            version=VERSION,
+            version=spec["version"],
         )
         d = node.type().definition()
         d.setMaxNumOutputs(len(cooks))
-        d.setIcon("kimodo_motion.svg")
-        d.setParmTemplateGroup(parms())
+        d.setIcon(spec["icon"])
+        d.setParmTemplateGroup(parms(spec))
         d.addSection(
             "OnCreated",
-            "from fxmotion.nodes import kimodo\n"
-            "kimodo.on_created(kwargs['node'])\n",
+            "from fxmotion.nodes import %s\n%s.on_created(kwargs['node'])\n"
+            % (spec["module"], spec["module"]),
         )
         d.setExtraFileOption("OnCreated/IsPython", True)
         d.addSection("DescriptiveParmName", "status")
-        d.addSection("Help", HELP)
+        d.addSection("Help", spec["help"])
         shelf = d.sections().get("Tools.shelf")
         if shelf is not None:
             d.addSection(
@@ -617,12 +725,15 @@ def build():
             d, ["Rest Geometry", "Capture Pose", "Animated Pose", "T-Pose"]
         )
         d.save(str(packed))
-        if LIBRARY.exists():
-            shutil.rmtree(LIBRARY)
-        hou.hda.expandToDirectory(str(packed), str(LIBRARY))
-        print("HDA saved: %s  type: %s" % (LIBRARY, NAME))
+        library = OTLS / spec["library"]
+        if library.exists():
+            shutil.rmtree(library)
+        hou.hda.expandToDirectory(str(packed), str(library))
+        print("HDA saved: %s  type: %s" % (library, spec["name"]))
     finally:
         geo.destroy()
 
 
-build()
+which = sys.argv[1] if len(sys.argv) > 1 else "all"
+for key in SPECS if which == "all" else [which]:
+    build(SPECS[key])

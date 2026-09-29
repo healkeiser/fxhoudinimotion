@@ -1,0 +1,15 @@
+Operator:     vb::ardy_motion::1.0
+Label:        ARDY Motion
+Path:         oplib:/vb::Sop/ardy_motion::1.0?vb::Sop/ardy_motion::1.0
+Icon:         NVIDIA_badge.svg
+Table:        Sop
+License:      
+Extra:        visibleoutputs=4 
+User:         
+Inputs:       0 to 2
+Outputs:      4
+Subnet:       true
+Python:       false
+Empty:        false
+Modified:     Tue Sep 29 20:55:49 2026
+
