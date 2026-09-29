@@ -13,3 +13,7 @@ houdini/otls/**/* text eol=lf
 
 # Gzipped section inside the expanded HDA is binary; never normalise its bytes
 houdini/otls/**/*.gz binary
+
+# Geometry and clips are binary; never normalise their bytes
+*.bgeo.sc binary
+*.npz binary

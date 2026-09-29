@@ -23,7 +23,6 @@ confirm. Use trace() in that script.
 import gc
 
 import hou
-
 from kimodo_timeline import model, widget
 from kimodo_timeline.qt import QtCore, QtWidgets
 

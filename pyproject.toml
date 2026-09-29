@@ -11,17 +11,16 @@ line-length = 80
 extend-exclude = ["vendor", "backup", "houdini/otls"]
 
 [tool.ruff.format]
-# _soma77.py is one long data table and its row grouping is the data: one line
+# soma77.py is one long data table and its row grouping is the data: one line
 # per limb, per finger chain, per side. Formatting it would put one element on
-# each line and make 77 joints unreadable. It is also embedded verbatim as the
-# HDA's PythonModule section, so reflowing it would mean regenerating the HDA
-# for nothing.
+# each line and make 77 joints unreadable. The 1.1 HDA embeds its own frozen
+# copy, so this file can change without touching it.
 #
 # Markdown, because ruff 0.16 started formatting the Python blocks inside
 # it. The snippets in CONTRIBUTING.md and docs/ are written to be read and
 # pasted, not to be black-clean: the live-test line is one statement on
 # purpose, so it can go into Houdini's Python Shell in one paste.
-exclude = ["scripts/_soma77.py", "*.md"]
+exclude = ["houdini/python/fxmotion/skeletons/soma77.py", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
@@ -38,11 +37,14 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-# _soma77 is a sibling module in scripts/, not a third-party package.
-known-first-party = ["kimodo_timeline", "_soma77"]
+known-first-party = ["fxmotion", "fxmotion_server", "kimodo_adapter", "kimodo_backend"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# fxmotion lives in houdini/python and the model servers in server/; both are
+# plain directories on PYTHONPATH in production (the Houdini package file, the
+# container's PYTHONPATH), so the tests see them the same way.
+pythonpath = ["houdini/python", "server"]
 # test_houdini_live.py imports hou at module level and drives real widgets, so
 # it only runs inside a running Houdini session, not hython and not here.
 # CONTRIBUTING.md says how to run it.

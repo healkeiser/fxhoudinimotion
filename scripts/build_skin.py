@@ -2,7 +2,7 @@
 
     hython scripts/build_skin.py [skin_standard.npz] [out_dir]
 
-Produces two .bgeo.sc files, embedded into the HDA by create_hda.py:
+Produces two .bgeo.sc files, read by the fxmotion skeleton registry:
   - skin.bgeo.sc  : the SOMA77 body mesh in its A-pose bind, with a KineFX
                     `boneCapture` attribute (weights from Kimodo LBS, bind from
                     bind_rig_transform). Drive it with kinefx::jointdeform
@@ -22,7 +22,10 @@ from pathlib import Path
 import hou
 import numpy as np
 
-from _soma77 import TPOSE_ROTS
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[1] / "houdini" / "python")
+)
+from fxmotion.skeletons.soma77 import TPOSE_ROTS  # noqa: E402
 
 _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parent
@@ -37,7 +40,11 @@ _DEFAULT_NPZ = (
     / "skin_standard.npz"
 )
 _SKIN_NPZ = Path(sys.argv[1]) if len(sys.argv) > 1 else _DEFAULT_NPZ
-_OUT_DIR = Path(sys.argv[2]) if len(sys.argv) > 2 else _REPO
+_OUT_DIR = (
+    Path(sys.argv[2])
+    if len(sys.argv) > 2
+    else _REPO / "houdini" / "python" / "fxmotion" / "skeletons" / "data"
+)
 
 
 def _houdini_world_rot(col_vec_rot):
@@ -160,8 +167,8 @@ def main():
     d = _load()
     skin = build_skin_geo(d)
     apose = build_apose_skeleton(d)
-    skin_path = _OUT_DIR / "skin.bgeo.sc"
-    apose_path = _OUT_DIR / "apose.bgeo.sc"
+    skin_path = _OUT_DIR / "soma77_skin.bgeo.sc"
+    apose_path = _OUT_DIR / "soma77_apose.bgeo.sc"
     skin.saveToFile(str(skin_path))
     apose.saveToFile(str(apose_path))
     bc = skin.findPointAttrib("boneCapture")
