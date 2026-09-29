@@ -1,0 +1,43 @@
+= Kimodo Motion =
+
+#type: node
+#context: sop
+#tags: kimodo, fxmotion, motion, ai, kinefx, animation
+
+Generates human motion from text prompts with NVIDIA Kimodo, as a 77-joint
+SOMA skeleton and a skinned body, ready for KineFX.
+
+== Overview ==
+
+The node talks to a running Kimodo server (see the fxhoudinimotion setup
+guide). __Generate__ sends the segments, the root path on input 0 and the
+pose keys from input 1; the finished clip downloads into __Download Dir__ and
+the skeleton is rebuilt on every frame. Houdini stays interactive meanwhile.
+
+Wire a __Joint Deform__ straight across (0 -> 0, 1 -> 1, 2 -> 2) for a moving
+body, the same output order as Houdini's Test Geometry characters.
+
+@inputs
+
+Root Path:
+    A curve or points: the root passes through their XZ positions. Points
+    with an int `frame` attribute are timed waypoints.
+
+Pose:
+    A posed SOMA77 skeleton (see __Create Pose Rig__), sampled at the pose
+    keys.
+
+@outputs
+
+Rest Geometry:
+    The SOMA77 body, bound to the Capture Pose.
+
+Capture Pose:
+    The skeleton the body is bound to.
+
+Animated Pose:
+    The generated motion. Detail attributes `fxmotion_skeleton`,
+    `fxmotion_fps` and `fxmotion_source` describe it.
+
+T-Pose:
+    The SOMA77 rest pose.

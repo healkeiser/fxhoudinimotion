@@ -1,0 +1,2 @@
+from fxmotion.nodes import kimodo
+kimodo.on_created(kwargs['node'])

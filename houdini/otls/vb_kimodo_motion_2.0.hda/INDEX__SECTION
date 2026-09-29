@@ -1,0 +1,15 @@
+Operator:     vb::kimodo_motion::2.0
+Label:        Kimodo Motion
+Path:         oplib:/vb::Sop/kimodo_motion::2.0?vb::Sop/kimodo_motion::2.0
+Icon:         kimodo_motion.svg
+Table:        Sop
+License:      
+Extra:        visibleoutputs=4 
+User:         
+Inputs:       0 to 2
+Outputs:      4
+Subnet:       true
+Python:       false
+Empty:        false
+Modified:     Tue Sep 29 19:02:23 2026
+

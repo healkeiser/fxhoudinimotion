@@ -20,6 +20,7 @@ generate the condition, and a human still has to click a Houdini pane to
 confirm. Use trace() in that script.
 """
 
+import contextlib
 import gc
 
 import hou
@@ -270,6 +271,103 @@ def test_no_mouse_event_escapes_the_canvas():
         _app().removeEventFilter(spy)
         c.deleteLater()
         host.deleteLater()
+
+
+def _repo():
+    """The clone: from FXMOTION_ROOT, else from where fxmotion was imported
+    (this file is exec'd, so it has no __file__ of its own)."""
+    import os
+    from pathlib import Path
+
+    import fxmotion
+
+    root = os.environ.get("FXMOTION_ROOT")
+    return Path(root) if root else Path(fxmotion.__file__).resolve().parents[3]
+
+
+def _kimodo_clip(canon):
+    """The Kimodo fixture as a saved fxmotion clip, via the server's own
+    adapter."""
+    import sys
+    import tempfile
+    from pathlib import Path
+
+    import numpy as np
+
+    from fxmotion import clipformat
+
+    sys.path.insert(0, str(_repo() / "server"))
+    import kimodo_adapter as ka
+
+    fixture = _repo() / "tests" / "fixtures" / "kimodo_stop.npz"
+    with np.load(fixture) as z:
+        npz = {k: z[k] for k in z.files}
+    path = Path(tempfile.mkdtemp()) / "clip.npz"
+    clipformat.save(path, ka.to_clip(npz, ka.Canon(*canon)))
+    return fixture, path
+
+
+def test_kimodo_2_matches_1_1():
+    """Same Kimodo clip, same root-path transform: output 2 of 2.0 must
+    carry 1.1's positions, transforms and local transforms."""
+    import numpy as np
+
+    canon = (1.5, -2.0, 0.7)
+    fixture, path = _kimodo_clip(canon)
+    geo = hou.node("/obj").createNode("geo", "fxmotion_parity")
+    try:
+        old = geo.createNode("vb::kimodo_motion::1.1")
+        old.parm("npz_path").set(fixture.as_posix())
+        old.parmTuple("path_xform").set(canon)
+        new = geo.createNode("vb::kimodo_motion::2.0")
+        new.parm("clip_path").set(path.as_posix())
+        for n in (old, new):
+            n.parm("start_frame").set(1)
+            n.parm("retime").set(0)
+        for frame in (1, 11, 26, 50):
+            hou.setFrame(frame)
+            a, b = old.geometry(2), new.geometry(2)
+            names_a = a.pointStringAttribValues("name")
+            assert names_a == b.pointStringAttribValues("name")
+            for attr, tol in (
+                ("P", 1e-5),
+                ("transform", 1e-5),
+                ("localtransform", 1e-4),
+            ):
+                x = np.array(a.pointFloatAttribValues(attr))
+                y = np.array(b.pointFloatAttribValues(attr))
+                err = float(np.abs(x - y).max())
+                assert err < tol, "%s differs by %g at frame %d" % (
+                    attr,
+                    err,
+                    frame,
+                )
+    finally:
+        geo.destroy()
+
+
+def test_kimodo_2_outputs_and_details():
+    _, path = _kimodo_clip((0.0, 0.0, 0.0))
+    geo = hou.node("/obj").createNode("geo", "fxmotion_outputs")
+    try:
+        node = geo.createNode("vb::kimodo_motion::2.0")
+        node.parm("clip_path").set(path.as_posix())
+        counts = [len(node.geometry(i).points()) for i in range(4)]
+        assert counts[0] > 1000, counts
+        assert counts[1] == counts[2] == counts[3] == 77, counts
+        g = node.geometry(2)
+        assert g.attribValue("fxmotion_skeleton") == "soma77"
+        assert g.attribValue("fxmotion_fps") == 30.0
+        assert '"backend": "kimodo"' in g.attribValue("fxmotion_source")
+        assert g.findPointAttrib("contact") is not None
+        assert node.errors() == ()
+        node.parm("last_error").set("boom")
+        # cook() raises on a node in error, which is the point
+        with contextlib.suppress(hou.OperationFailed):
+            node.cook(force=True)
+        assert any("boom" in e for e in node.errors())
+    finally:
+        geo.destroy()
 
 
 def run():
